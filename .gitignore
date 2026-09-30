@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# 构建产物
+dist/
+build/
+*.spec.bak
+
+# 外部工具与模型（不入库，来源见 THIRD-PARTY-NOTICES.md）
+tools/
+model_conv/*.pth
+
+# 模型转换中间产物
+model_conv/regen_*.bin
+
+# 断点续跑帧备份（本地数据）
+backup_frames/
+
+# 测试与临时产物
+tests/last_run.log
+tools_test/
+*.part
+
+# IDE / 系统
+.idea/
+.vscode/
+Thumbs.db
+desktop.ini
+
+# PyInstaller 自动生成的 spec（build_app.py 每次重建）
+*.spec

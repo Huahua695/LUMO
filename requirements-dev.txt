@@ -1,0 +1,7 @@
+# 开发/构建/测试依赖
+-r requirements.txt
+PyInstaller>=6.10
+Pillow>=10.0
+numpy>=1.26
+# 仅 model_conv 模型转换需要（读 PyTorch 权重），运行时不需要
+torch>=2.2
