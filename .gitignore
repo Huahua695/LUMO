@@ -32,3 +32,8 @@ desktop.ini
 
 # PyInstaller 自动生成的 spec（build_app.py 每次重建）
 *.spec
+图标.jpeg
+
+# 离屏渲染调试截图与本地素材
+docs/screenshots/
+图标.jpeg

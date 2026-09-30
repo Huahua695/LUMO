@@ -1,5 +1,9 @@
 # 拾光工具箱 (ShiGuang Toolbox / LUMO)
 
+<p align="center">
+  <img src="assets/icon.png" width="140" alt="LUMO">
+</p>
+
 > 轻量、简洁、可视化的桌面媒体工具箱：**资源无损下载 · AI 画质增强 · 视频剪切**。
 > 全部处理在本机完成，不上传任何数据，拔网线也能用。
 

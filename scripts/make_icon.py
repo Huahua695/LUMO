@@ -1,20 +1,40 @@
-"""生成应用图标 icon.ico / icon.png。"""
+"""生成应用图标 icon.ico / icon.png。
+
+优先使用项目根目录的 图标.jpeg（品牌设计稿）：居中裁方后缩放为多尺寸 ico。
+没有设计稿时回退到程序化绘制的"拾"字图标。
+"""
 import os
 
 from PIL import Image, ImageDraw, ImageFont
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-SIZE = 256
+ROOT = os.path.dirname(HERE)
+ASSETS = os.path.join(ROOT, "assets")
+ICO_SIZES = [(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)]
 
 
-def build():
+def build_from_design():
+    src = os.path.join(ROOT, "图标.jpeg")
+    if not os.path.isfile(src):
+        return False
+    img = Image.open(src).convert("RGBA")
+    w, h = img.size
+    side = min(w, h)
+    # 居中裁方
+    left, top = (w - side) // 2, (h - side) // 2
+    img = img.crop((left, top, left + side, top + side))
+    icon = img.resize((256, 256), Image.LANCZOS)
+    icon.save(os.path.join(ASSETS, "icon.png"))
+    icon.save(os.path.join(ASSETS, "icon.ico"), sizes=ICO_SIZES)
+    return True
+
+
+def build_drawn():
+    SIZE = 256
     img = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-
-    # 垂直渐变底：蓝 -> 紫
     grad = Image.new("RGBA", (SIZE, SIZE))
-    top = (79, 140, 255)
-    bottom = (150, 94, 255)
     d = ImageDraw.Draw(grad)
+    top, bottom = (79, 140, 255), (150, 94, 255)
     for y in range(SIZE):
         t = y / (SIZE - 1)
         c = tuple(int(top[i] + (bottom[i] - top[i]) * t) for i in range(3)) + (255,)
@@ -23,9 +43,7 @@ def build():
     dm = ImageDraw.Draw(mask)
     dm.rounded_rectangle([8, 8, SIZE - 8, SIZE - 8], radius=56, fill=255)
     img.paste(grad, (0, 0), mask)
-
     draw = ImageDraw.Draw(img)
-    # 白色"拾"字
     font = None
     for fp in (r"C:\Windows\Fonts\msyhbd.ttc", r"C:\Windows\Fonts\msyh.ttc",
                r"C:\Windows\Fonts\simhei.ttf"):
@@ -37,16 +55,14 @@ def build():
                 continue
     if font:
         draw.text((SIZE / 2, SIZE / 2 - 6), "拾", font=font, fill="white", anchor="mm")
-    # 右上角小星星点缀
-    r = 14
-    cx, cy = SIZE - 44, 42
-    draw.regular_polygon((cx, cy, r), n_sides=4, rotation=45, fill=(255, 255, 255, 230))
-
-    img.save(os.path.join(HERE, "icon.png"))
-    img.save(os.path.join(HERE, "icon.ico"),
-             sizes=[(256, 256), (128, 128), (64, 64), (48, 48), (32, 32), (16, 16)])
-    print("icon written")
+    img.save(os.path.join(ASSETS, "icon.png"))
+    img.save(os.path.join(ASSETS, "icon.ico"), sizes=ICO_SIZES)
 
 
 if __name__ == "__main__":
-    build()
+    os.makedirs(ASSETS, exist_ok=True)
+    if build_from_design():
+        print("icon 来自 图标.jpeg（居中裁方，多尺寸）")
+    else:
+        build_drawn()
+        print("未找到设计稿，icon 为程序化绘制版本")
