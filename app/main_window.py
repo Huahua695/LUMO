@@ -13,8 +13,8 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("拾光工具箱")
-        self.resize(1040, 720)
-        self.setMinimumSize(940, 640)
+        self.resize(1080, 840)
+        self.setMinimumSize(1000, 760)
 
         self.settings = AppSettings()
 

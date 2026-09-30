@@ -2,11 +2,11 @@
 import os
 import queue
 
-from PySide6.QtCore import Qt, Signal, QTimer
+from PySide6.QtCore import QSize, Qt, Signal, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
     QPlainTextEdit, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout,
-    QWidget, QProgressBar, QSizePolicy,
+    QWidget, QProgressBar,
 )
 
 import theme
@@ -47,18 +47,18 @@ class TaskRow(QWidget):
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
         self.bar.setValue(0)
-        self.bar.setFixedWidth(230)
+        self.bar.setFixedWidth(200)
         self.bar.setTextVisible(False)
 
         self.name_label = QLabel("准备中…")
         self.name_label.setStyleSheet("font-weight:600; font-size:13px;")
-        self.name_label.setFixedWidth(300)
+        self.name_label.setMinimumWidth(150)
         self.meta_label = QLabel("")
         self.meta_label.setObjectName("sub")
 
         self.status_label = QLabel("排队中")
         self.status_label.setObjectName("sub")
-        self.status_label.setFixedWidth(150)
+        self.status_label.setMinimumWidth(130)
 
         self.btn = QPushButton("取消")
         self.btn.setProperty("danger", True)
@@ -136,18 +136,17 @@ class DownloadTab(QWidget):
         self.active = 0
 
         root = QVBoxLayout(self)
-        root.setContentsMargins(28, 24, 28, 20)
+        root.setContentsMargins(28, 22, 28, 18)
         root.setSpacing(14)
 
         # ---- 卡片1：链接与保存位置 ----
         c1 = QFrame(objectName="card")
         v1 = QVBoxLayout(c1)
-        v1.setContentsMargins(20, 18, 20, 18)
+        v1.setContentsMargins(24, 18, 24, 18)
         v1.setSpacing(10)
         t = QLabel("下载资源")
         t.setObjectName("h1")
-        s = QLabel("支持直接粘贴：B站 / YouTube / 抖音 / X 等网站链接，m3u8/HLS 直播源，"
-                   "或以 .mp4 / .mp3 / .jpg 等结尾的文件直链。原始数据原样保存，不转码、无损。")
+        s = QLabel("支持网站链接（B站 / YouTube / 抖音等）、m3u8/HLS、文件直链，原始数据无损保存。")
         s.setObjectName("sub")
         s.setWordWrap(True)
         v1.addWidget(t)
@@ -159,7 +158,7 @@ class DownloadTab(QWidget):
         self.url_edit.setPlaceholderText(
             "把链接粘贴到这里…（支持一次粘贴多个，自动排队下载；\n"
             "也可以粘贴整段文字，会自动提取其中的链接）")
-        self.url_edit.setFixedHeight(76)
+        self.url_edit.setFixedHeight(62)
         self.url_edit.textChanged.connect(self._on_url_changed)
         self.btn_paste = QPushButton("粘贴")
         self.btn_paste.setProperty("ghost", True)
@@ -178,10 +177,10 @@ class DownloadTab(QWidget):
             f"QFrame {{ background:#f7faff; border:1px solid {theme.BORDER};"
             f" border-radius:10px; }}")
         pl = QHBoxLayout(self.probe_card)
-        pl.setContentsMargins(12, 10, 12, 10)
+        pl.setContentsMargins(10, 8, 10, 8)
         pl.setSpacing(12)
         self.thumb_label = QLabel("🖼")
-        self.thumb_label.setFixedSize(128, 72)
+        self.thumb_label.setFixedSize(112, 60)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.thumb_label.setStyleSheet(
             "background:#e8edf5; border:none; border-radius:6px; font-size:22px;")
@@ -246,7 +245,7 @@ class DownloadTab(QWidget):
         self.save_hint.setObjectName("sub")
         srow2.addWidget(lblq)
         srow2.addWidget(self.quality)
-        srow2.addSpacing(8)
+        srow2.addSpacing(28)
         srow2.addWidget(lblf)
         srow2.addWidget(self.fmt)
         srow2.addStretch(1)
@@ -305,7 +304,7 @@ class DownloadTab(QWidget):
         # ---- 卡片2：任务列表 ----
         c2 = QFrame(objectName="card")
         v2 = QVBoxLayout(c2)
-        v2.setContentsMargins(20, 16, 20, 16)
+        v2.setContentsMargins(24, 18, 24, 18)
         v2.setSpacing(8)
         h = QHBoxLayout()
         t2 = QLabel("任务列表")
@@ -321,14 +320,18 @@ class DownloadTab(QWidget):
         h.addWidget(clear)
         v2.addLayout(h)
         self.list = QListWidget()
-        self.list.setSpacing(2)
-        self.list.setMinimumHeight(260)
+        self.list.setSpacing(4)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.list.setMinimumHeight(100)
         v2.addWidget(self.list)
+        self.empty_hint = QLabel("还没有任务 —— 粘贴链接后点「开始下载」，进度会显示在这里"
+                                 "（最多同时 3 个，完成后点任务右侧「打开」定位文件）")
+        self.empty_hint.setObjectName("sub")
+        self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.empty_hint.setContentsMargins(0, 12, 0, 12)
+        self.empty_hint.setWordWrap(True)
+        v2.addWidget(self.empty_hint)
         root.addWidget(c2, 1)
-
-        hint = QLabel("提示：任务完成后点右侧「打开」可直接定位文件；最多同时下载 3 个任务。")
-        hint.setObjectName("sub")
-        root.addWidget(hint)
 
     # ---------- 交互 ----------
     def _paste(self):
@@ -399,6 +402,7 @@ class DownloadTab(QWidget):
         self._probe_task.sig.connect(self._on_probe_event)
         self.probe_title.setText("")
         self.probe_meta.setText("")
+        self.probe_status.setStyleSheet("")
         self.probe_status.setText("正在解析…")
         self.probe_quality.clear()
         self.probe_qlabel.setVisible(False)
@@ -431,6 +435,7 @@ class DownloadTab(QWidget):
     def _show_video_probe(self, ev):
         from cut_engine import fmt_time
         from PySide6.QtGui import QPixmap
+        self.probe_card.setVisible(True)
         thumb = ev.get("thumbnail") or ""
         if thumb and os.path.isfile(thumb):
             pm = QPixmap(thumb)
@@ -529,6 +534,15 @@ class DownloadTab(QWidget):
     def _on_fmt_changed(self):
         self.settings.dl_format = self.fmt.currentData()
         self._refresh_save_options()
+        # 仅音频模式：解析卡片（画质列表）无意义，隐藏；切回后重新解析
+        if self.fmt.currentData() in ("mp3", "m4a"):
+            self._probe_timer.stop()
+            self._cancel_probe()
+            self.probe_card.setVisible(False)
+        else:
+            urls = self._urls()
+            if len(urls) == 1 and detect_engine(urls[0]) == "site":
+                self._probe_timer.start()
 
     def _update_save_hint(self):
         urls = self._urls()
@@ -601,6 +615,10 @@ class DownloadTab(QWidget):
         os.makedirs(self.settings.save_dir, exist_ok=True)
         for u in urls:
             self._spawn(detect_engine(u), u)
+        # 提交后清空输入，避免再次点击造成重复下载
+        n = len(urls)
+        self.url_edit.clear()
+        self.detect_label.setText(f"已提交 {n} 个下载任务")
 
     def _spawn(self, eng, url):
         tid = self.next_id
@@ -628,7 +646,8 @@ class DownloadTab(QWidget):
         row = TaskRow(tid)
         row.set_state(engine=ENGINE_LABEL[eng], pct=None, text="排队中")
         row.cancel_clicked.connect(self._cancel)
-        item.setSizeHint(row.sizeHint())
+        item.setSizeHint(QSize(self.list.viewport().width() - 10,
+                               max(56, row.sizeHint().height())))
         self.list.addItem(item)
         self.list.setItemWidget(item, row)
 
@@ -697,6 +716,22 @@ class DownloadTab(QWidget):
             self.active += 1
         self._refresh_summary()
 
+    def resizeEvent(self, e):
+        super().resizeEvent(e)
+        self._sync_row_widths()
+
+    def _sync_row_widths(self):
+        """任务行宽度跟随列表视口，避免长文件名把列表撑出横向滚动条。"""
+        w = self.list.viewport().width() - 10
+        if w <= 20:
+            return
+        for i in range(self.list.count()):
+            it = self.list.item(i)
+            r = self.list.itemWidget(it)
+            if r is not None:
+                it.setSizeHint(QSize(w, max(56, r.sizeHint().height())))
+
     def _refresh_summary(self):
         n_run = sum(1 for t in self.threads.values() if t.isRunning())
         self.summary.setText(f"进行中 {n_run} · 排队 {self.pending.qsize()}")
+        self.empty_hint.setVisible(self.list.count() == 0)
