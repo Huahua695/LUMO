@@ -11,6 +11,19 @@ from .utils import DEFAULT_UA, filename_from_url, unique_path, now_tag, sanitize
 
 CHUNK = 256 * 1024
 
+HTML_CONTENT_TYPES = ("text/html", "application/xhtml+xml")
+_EXT_BY_CONTENT = {
+    "video/mp4": ".mp4", "video/webm": ".webm", "video/x-matroska": ".mkv",
+    "video/quicktime": ".mov", "audio/mpeg": ".mp3", "audio/mp4": ".m4a",
+    "audio/aac": ".aac", "image/jpeg": ".jpg", "image/png": ".png",
+    "image/webp": ".webp",
+}
+
+
+def _ext_for_content(ctype: str) -> str:
+    """按响应 Content-Type 补文件扩展名（仅精确映射，宁缺勿错）。"""
+    return _EXT_BY_CONTENT.get((ctype or "").split(";")[0].strip().lower(), "")
+
 
 def _name_from_disposition(cd: str) -> str:
     if not cd:
@@ -50,13 +63,23 @@ class DirectDownloadTask(BaseTask):
         note = ""
         try:
             origin = "{0.scheme}://{0.netloc}".format(urllib.parse.urlparse(self.url))
-            # 1) 探测：文件名与总大小
+            # 1) 探测：内容类型 / 文件名与总大小
             with self._open(origin) as resp:
                 total = int(resp.headers.get("Content-Length") or 0)
+                ctype = (resp.headers.get("Content-Type") or "").split(";")[0]
+                ctype = ctype.strip().lower()
+                if ctype in HTML_CONTENT_TYPES:
+                    # 网站返回了反爬验证页/失效页——绝不能存成假视频
+                    raise RuntimeError(
+                        "返回的是网页而不是媒体文件（链接可能已失效，"
+                        "或触发了网站的风控验证），请稍后重试")
                 name = (self._name_hint
                         or _name_from_disposition(resp.headers.get("Content-Disposition", ""))
                         or filename_from_url(self.url)
                         or f"文件_{now_tag()}")
+                if self._name_hint and not os.path.splitext(name)[1]:
+                    # 调用方给的名字不带扩展名（如抖音标题）时按类型补全
+                    name += _ext_for_content(ctype)
             final = unique_path(os.path.join(self.save_dir, name))
             tmp = final + ".part"
 
@@ -152,6 +175,8 @@ class DouyinDownloadTask(DirectDownloadTask):
 
     probe 已解析出 play_url 时直接下载；否则在线程内解析
     （app/douyin.py，失败信息明确，不再回退 yt-dlp）。
+    下载前预检 play_url：抖音播放链接带时效签名，过期或风控时
+    服务器返回 200 + HTML 验证页——此时重新解析一次再下（共两轮）。
     """
 
     def __init__(self, task_id, url, save_dir, fmt="auto",
@@ -159,15 +184,36 @@ class DouyinDownloadTask(DirectDownloadTask):
         super().__init__(task_id, url, save_dir, fmt=fmt, name=name, parent=parent)
         self._play_url = (play_url or "").strip()
 
+    def _play_looks_html(self) -> bool:
+        try:
+            req = urllib.request.Request(
+                self.url, headers={"User-Agent": "Mozilla/5.0", "Accept": "*/*"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                ctype = (r.headers.get("Content-Type") or "").lower()
+                head = r.read(16)
+        except Exception:
+            return False  # 网络错误交给直链引擎去报
+        return ("text/html" in ctype
+                or head.lstrip()[:1] == b"<")
+
     def run(self):
-        if not self._play_url:
-            self._emit(event="started", name="抖音解析中…", resumed=False)
-            try:
-                from .douyin import resolve
-                info = resolve(self.url)
-            except Exception as e:
-                self.error(f"抖音解析失败：{e}")
-                return
-            self.url = info["play_url"]
-            self._name_hint = info["title"]
+        for _attempt in range(2):
+            if not self._play_url:
+                self._emit(event="started", name="抖音解析中…", resumed=False)
+                try:
+                    from .douyin import resolve
+                    info = resolve(self.url)
+                except Exception as e:
+                    self.error(f"抖音解析失败：{e}")
+                    return
+                self.url = info["play_url"]
+                self._name_hint = info["title"]
+            if not self._play_looks_html():
+                break
+            # 链接失效/风控：丢弃当前链接，重新解析拿新鲜签名
+            self._play_url = ""
+        else:
+            self.error("抖音下载失败：播放链接已失效（两次解析均返回验证页），"
+                       "请稍后重试")
+            return
         super().run()

@@ -628,6 +628,67 @@ def t_download_tab_batch():
         srv.shutdown()
 
 
+def t_direct_guard():
+    """直链防线：HTML 验证页拒绝落盘 + 标题文件名按类型补扩展名"""
+    from app.direct_dl import DirectDownloadTask, _ext_for_content
+
+    assert _ext_for_content("video/mp4") == ".mp4"
+    assert _ext_for_content("image/png; charset=binary") == ".png"
+    assert _ext_for_content("application/octet-stream") == ""
+
+    # 1) 服务器返回 text/html（模拟抖音风控验证页）：必须报错且不落盘
+    d = tempfile.mkdtemp()
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b"<html><head><meta charset=\"UTF-8\"></head><body>verify</body></html>"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=UTF-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        t = DirectDownloadTask(90, f"http://127.0.0.1:{srv.server_address[1]}/v",
+                               d, name="标题 #测试")
+        events = run_task_until(t, 30)
+        errs = [e for e in events if e["event"] == "error"]
+        assert errs and "网页" in errs[0]["error"], events[-1] if events else "无事件"
+        assert os.listdir(d) == [], f"不应落盘: {os.listdir(d)}"
+    finally:
+        srv.shutdown()
+
+    # 2) video/mp4 响应 + 无扩展名的标题 → 文件名自动补 .mp4
+    class H2(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b"\x00\x00\x00 ftypisom" + b"\x00" * 4096
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+
+    srv2 = ThreadingHTTPServer(("127.0.0.1", 0), H2)
+    threading.Thread(target=srv2.serve_forever, daemon=True).start()
+    try:
+        t = DirectDownloadTask(91, f"http://127.0.0.1:{srv2.server_address[1]}/v",
+                               d, name="恶搞之家 #动画 #解说")
+        events = run_task_until(t, 30)
+        done = [e for e in events if e["event"] == "done"]
+        assert done, f"未完成: {events[-1] if events else '无事件'}"
+        assert os.path.basename(done[0]["path"]) == "恶搞之家 #动画 #解说.mp4"
+    finally:
+        srv2.shutdown()
+        shutil.rmtree(d)
+
+
 def t_direct_convert_image():
     """直链 PNG 下载后转 JPG"""
     from app.direct_dl import DirectDownloadTask
@@ -740,6 +801,7 @@ def main():
     print("== 下载引擎集成 ==")
     check("直链下载 Range 断点续传", t_direct_download_resume)
     check("直链下载全新下载", t_direct_download_fresh_and_cancel)
+    check("直链防线（HTML 拒绝/扩展名补全）", t_direct_guard)
     check("直链 PNG→JPG 转换", t_direct_convert_image)
     check("直链 MP4→MP3 提取", t_direct_convert_audio)
     check("下载页批量粘贴自动排队", t_download_tab_batch)
