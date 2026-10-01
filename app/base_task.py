@@ -1,7 +1,9 @@
 """所有下载/增强/剪切任务的线程基类：统一信号、取消机制、运行期防睡眠。"""
+import subprocess
+
 from PySide6.QtCore import QThread, Signal
 
-from sleep_guard import acquire as _sleep_acquire, release as _sleep_release
+from .sleep_guard import acquire as _sleep_acquire, release as _sleep_release
 
 
 class BaseTask(QThread):
@@ -11,7 +13,7 @@ class BaseTask(QThread):
         super().__init__(parent)
         self.task_id = task_id
         self._cancelled = False
-        self._proc = None
+        self._proc: subprocess.Popen | None = None
         # 线程结束时归还"阻止睡眠"名额
         self.finished.connect(self._release_sleep)
 

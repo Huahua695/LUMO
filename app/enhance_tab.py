@@ -1,5 +1,6 @@
-"""画质增强页 v1.1：三种模式、视频倍率选择、断点续跑恢复横幅。"""
+"""画质增强页：三种模式、视频倍速、断点续跑恢复横幅、可折叠日志。"""
 import os
+import uuid
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -7,10 +8,11 @@ from PySide6.QtWidgets import (
     QPushButton, QVBoxLayout, QWidget, QProgressBar,
 )
 
-import theme
-from theme import elide
-from utils import IMAGE_EXTS, VIDEO_EXTS, open_in_explorer, human_size
-from app_settings import AppSettings
+from . import icons, theme
+from .theme import elide
+from .utils import IMAGE_EXTS, VIDEO_EXTS
+from .app_settings import AppSettings
+from .widgets import PathRow, SectionCard
 
 FILTER = "媒体文件 (*" + " *".join(sorted(IMAGE_EXTS | VIDEO_EXTS)) + ")"
 
@@ -56,42 +58,36 @@ class EnhanceTab(QWidget):
         root.setContentsMargins(28, 24, 28, 20)
         root.setSpacing(14)
 
-        c1 = QFrame(objectName="card")
-        v1 = QVBoxLayout(c1)
-        v1.setContentsMargins(20, 18, 20, 18)
-        v1.setSpacing(10)
-        t = QLabel("画质增强")
-        t.setObjectName("h1")
+        c1 = SectionCard("画质增强", title_style="h1")
+        v1 = c1.body
         s = QLabel("用 AI 把图片和视频变得更清晰（超分辨率）。把文件拖到下面，或点「添加文件」。"
                    "风景/人像选照片模式，动漫/动画选动漫模式，真人视频选真人·通用模式。")
         s.setObjectName("sub")
         s.setWordWrap(True)
-        v1.addWidget(t)
         v1.addWidget(s)
 
-        # 恢复横幅（检测到被中断的任务时显示）
-        self.resume_box = QFrame()
-        self.resume_box.setStyleSheet(
-            f"QFrame {{ background:#fff8e6; border:1px solid #f0d9a8;"
-            f" border-radius:10px; }}")
+        # 恢复横幅（检测到被中断的任务时显示；多个任务收进「查看全部」下拉）
+        self.resume_box = QFrame(objectName="warnBanner")
         self.resume_lay = QHBoxLayout(self.resume_box)
         self.resume_lay.setContentsMargins(12, 8, 12, 8)
         self.resume_lay.setSpacing(8)
-        self.resume_lay.addWidget(QLabel("🔄"))
+        self.resume_icon = QLabel()
+        self.resume_lay.addWidget(self.resume_icon)
         self.resume_label = QLabel("检测到上次未完成的增强任务")
         self.resume_lay.addWidget(self.resume_label, 1)
         self.resume_btn = QPushButton("恢复任务")
         self.resume_btn.clicked.connect(self._resume_last)
         self.resume_lay.addWidget(self.resume_btn)
+        self.resume_more = QComboBox()
+        self.resume_more.setVisible(False)
+        self.resume_more.currentIndexChanged.connect(self._on_more_resume)
+        self.resume_lay.addWidget(self.resume_more)
         self.resume_box.setVisible(False)
         v1.addWidget(self.resume_box)
 
         self.file_list = FileList(self)
         self.file_list.setMinimumHeight(120)
-        self.file_list.setStyleSheet(
-            f"QListWidget {{ background:#fbfcfe; border:1.5px dashed {theme.BORDER};"
-            f" border-radius:10px; padding:6px; }}"
-            f"QListWidget:hover {{ border-color:{theme.ACCENT}; }}")
+        self.file_list.setObjectName("dropList")
         v1.addWidget(self.file_list)
 
         brow = QHBoxLayout()
@@ -124,34 +120,18 @@ class EnhanceTab(QWidget):
 
         self.hint = QLabel("")
         self.hint.setObjectName("sub")
-        self.hint.setWordWrap(True)
         v1.addWidget(self.hint)
         self.mode.currentIndexChanged.connect(self._update_hint)
         self.scale.currentIndexChanged.connect(self._update_hint)
 
-        line = QFrame()
+        line = QFrame(objectName="hr")
         line.setFixedHeight(1)
-        line.setStyleSheet(f"background:{theme.BORDER}; border:none;")
         v1.addWidget(line)
 
-        orow = QHBoxLayout()
-        lbl = QLabel("输出位置")
-        lbl.setObjectName("h2")
-        self.out_label = QLabel()
-        self.out_label.setObjectName("sub")
-        self.out_label.setText(elide(self.settings.enhance_dir, 52))
-        self.out_label.setToolTip(self.settings.enhance_dir)
-        ob = QPushButton("更改…")
-        ob.setProperty("ghost", True)
-        ob.clicked.connect(self._pick_out)
-        ob2 = QPushButton("打开文件夹")
-        ob2.setProperty("ghost", True)
-        ob2.clicked.connect(lambda: open_in_explorer(self.settings.enhance_dir))
-        orow.addWidget(lbl)
-        orow.addWidget(self.out_label, 1)
-        orow.addWidget(ob)
-        orow.addWidget(ob2)
-        v1.addLayout(orow)
+        v1.addLayout(PathRow("输出位置",
+                             lambda: self.settings.enhance_dir,
+                             lambda d: setattr(self.settings, "enhance_dir", d),
+                             changed=self._refresh_resume))
 
         srow = QHBoxLayout()
         self.status = QLabel("")
@@ -169,39 +149,55 @@ class EnhanceTab(QWidget):
         v1.addLayout(srow)
         root.addWidget(c1)
 
-        c2 = QFrame(objectName="card")
-        v2 = QVBoxLayout(c2)
-        v2.setContentsMargins(20, 16, 20, 16)
-        v2.setSpacing(8)
-        t2 = QLabel("处理进度")
-        t2.setObjectName("h2")
-        v2.addWidget(t2)
+        # ---- 处理进度：进度条与当前文件一行；日志默认折叠 ----
+        c2 = SectionCard("处理进度", title_style="h2", spacing=8)
+        v2 = c2.body
+        prow = QHBoxLayout()
+        prow.setSpacing(12)
         self.bar = QProgressBar()
         self.bar.setTextVisible(False)
         self.bar.setRange(0, 100)
         self.bar.setValue(0)
-        v2.addWidget(self.bar)
         self.now_label = QLabel("等待任务…")
         self.now_label.setObjectName("sub")
-        v2.addWidget(self.now_label)
+        theme.tabular(self.now_label)
+        prow.addWidget(self.bar, 1)
+        prow.addWidget(self.now_label)
+        v2.addLayout(prow)
+
+        trow = QHBoxLayout()
+        self.log_toggle = QPushButton("查看日志 ▸")
+        self.log_toggle.setProperty("ghost", True)
+        self.log_toggle.clicked.connect(self._toggle_log)
+        trow.addWidget(self.log_toggle)
+        trow.addStretch(1)
+        v2.addLayout(trow)
         self.log = QListWidget()
         self.log.setMinimumHeight(140)
+        self.log.setVisible(False)
         v2.addWidget(self.log)
+        v2.addStretch(1)
         root.addWidget(c2, 1)
 
         self._update_hint()
         self._refresh_resume()
+        self._refresh_banner_icon()
+        theme.on_theme_changed(self._refresh_banner_icon)
+
+    def _refresh_banner_icon(self):
+        pm = icons.pixmap_for(self, "refresh", theme.current()["warn_icon"], 16)
+        if pm is not None:
+            self.resume_icon.setPixmap(pm)
 
     # ---------- 断点续跑 ----------
     def _refresh_resume(self):
-        from enhance import find_interrupted_jobs
+        from .enhance import find_interrupted_jobs
         jobs = find_interrupted_jobs(self.settings.enhance_dir)
-        while self.resume_lay.count() > 2:  # 保留图标和文字标签
-            item = self.resume_lay.takeAt(2)
-            w = item.widget()
-            if w:
-                w.deleteLater()
         self._resume_jobs = jobs
+        self.resume_more.blockSignals(True)
+        self.resume_more.clear()
+        self.resume_more.blockSignals(False)
+        self.resume_more.setVisible(False)
         if not jobs or (self.thread and self.thread.isRunning()):
             self.resume_box.setVisible(False)
             return
@@ -211,15 +207,23 @@ class EnhanceTab(QWidget):
         self.resume_label.setText(
             f"检测到未完成任务：《{elide(src, 24)}》 已完成 {done}/{total} 帧 —"
             " 重启/关闭软件不会丢失该进度")
-        for extra in jobs[1:3]:
-            n2, d2, done2 = extra
-            btn2 = QPushButton(f"恢复《{elide(os.path.basename(d2.get('source','')), 14)}》"
-                               f"({done2}帧)")
-            btn2.setProperty("ghost", True)
-            btn2.clicked.connect(lambda _=False, j=(n2, d2, done2): self._resume(j))
-            self.resume_lay.addWidget(btn2)
+        if len(jobs) > 1:
+            self.resume_more.addItem(f"查看全部 ({len(jobs)})")
+            for i, (n2, d2, done2) in enumerate(jobs[1:], start=1):
+                label = (f"恢复《{elide(os.path.basename(d2.get('source', '')), 16)}》"
+                         f"（{done2} 帧）")
+                self.resume_more.addItem(label, i)
+            self.resume_more.setVisible(True)
         self.resume_btn.setText("恢复任务")
         self.resume_box.setVisible(True)
+
+    def _on_more_resume(self, idx):
+        data = self.resume_more.itemData(idx)
+        if data:
+            self.resume_more.blockSignals(True)
+            self.resume_more.setCurrentIndex(0)
+            self.resume_more.blockSignals(False)
+            self._resume(self._resume_jobs[data])
 
     def _resume_last(self):
         if getattr(self, "_resume_jobs", None):
@@ -228,14 +232,16 @@ class EnhanceTab(QWidget):
     def _resume(self, job):
         if self.thread and self.thread.isRunning():
             return
-        from enhance import ResumeTask
+        from .enhance import ResumeTask
         name, d, done = job
-        self.resume_thread = ResumeTask(2, self.settings.enhance_dir, name)
+        self.resume_thread = ResumeTask(uuid.uuid4().hex[:8],
+                                        self.settings.enhance_dir, name)
         self.resume_thread.sig.connect(self._on_event)
         self.btn_start.setEnabled(False)
         self.btn_cancel.setVisible(True)
-        self.status.setStyleSheet("")
+        theme.retag(self.status, "sub")
         self.status.setText("恢复中…")
+        self._set_log_visible(True)
         self.log.addItem(f"↻ 恢复任务：{os.path.basename(d.get('source',''))}（已有 {done} 帧）")
         self.resume_thread.start()
 
@@ -254,14 +260,6 @@ class EnhanceTab(QWidget):
         start = self.settings.enhance_dir if os.path.isdir(self.settings.enhance_dir) else ""
         files, _ = QFileDialog.getOpenFileNames(self, "选择要增强的文件", start, FILTER)
         self.add_files(files)
-
-    def _pick_out(self):
-        d = QFileDialog.getExistingDirectory(self, "选择输出位置", self.settings.enhance_dir)
-        if d:
-            self.settings.enhance_dir = d
-            self.out_label.setText(elide(d, 52))
-            self.out_label.setToolTip(d)
-            self._refresh_resume()
 
     def _files(self):
         return [self.file_list.item(i).text() for i in range(self.file_list.count())]
@@ -285,26 +283,36 @@ class EnhanceTab(QWidget):
                 tip = "动漫模式：动漫图片质量最佳；2 倍时自动使用快速模型。"
             else:
                 tip = "真人·通用模式：通用模型，真实照片速度快、细节自然。"
-        self.hint.setText(tip)
+        # 单行提示，超长部分进 tooltip
+        self.hint.setText(elide(tip, 62))
+        self.hint.setToolTip(tip)
+
+    # ---------- 日志折叠 ----------
+    def _toggle_log(self):
+        self._set_log_visible(not self.log.isVisibleTo(self))
+
+    def _set_log_visible(self, show: bool):
+        self.log.setVisible(show)
+        self.log_toggle.setText("收起日志 ▾" if show else "查看日志 ▸")
 
     # ---------- 运行 ----------
     def _start(self):
         files = self._files()
         if not files:
+            theme.retag(self.status, "err")
             self.status.setText("请先添加文件")
-            self.status.setStyleSheet(
-                f"color:{theme.RED}; background:transparent; border:none;")
             return
         os.makedirs(self.settings.enhance_dir, exist_ok=True)
-        from enhance import EnhanceTask
-        self.thread = EnhanceTask(1, files, self.mode.currentData(),
+        from .enhance import EnhanceTask
+        self.thread = EnhanceTask(uuid.uuid4().hex[:8], files,
+                                  self.mode.currentData(),
                                   self.scale.currentData(), self.settings.enhance_dir)
         self.thread.sig.connect(self._on_event)
         self.btn_start.setEnabled(False)
         self.btn_cancel.setVisible(True)
         self.log.clear()
         self.bar.setValue(0)
-        self.status.setStyleSheet("")
+        theme.retag(self.status, "sub")
         self.status.setText("处理中…")
         self.thread.start()
 
@@ -327,7 +335,9 @@ class EnhanceTab(QWidget):
                 parts.append(f"{ev['done']}/{ev['total']} 帧")
             if ev.get("fps") is not None:
                 parts.append(f"{ev['fps']:.1f} 帧/秒")
-            self.now_label.setText("  ·  ".join(parts))
+            text = "  ·  ".join(parts)
+            self.now_label.setText(elide(text, 48))
+            self.now_label.setToolTip(text)
             if ev.get("pct") is not None:
                 self.bar.setRange(0, 100)
                 self.bar.setValue(int(ev["pct"]))
@@ -345,19 +355,20 @@ class EnhanceTab(QWidget):
             self.bar.setValue(100)
             for name, msg in errs:
                 self.log.addItem(f"✗ {name}：{msg}")
-            self.status.setStyleSheet(
-                f"color:{theme.GREEN}; font-weight:600; background:transparent; border:none;")
+            theme.retag(self.status, "ok")
             self.status.setText(f"完成：成功 {n_ok} 个" + (f"，失败 {len(errs)} 个" if errs else ""))
+            if errs:
+                self._set_log_visible(True)
             self._finish_ui()
         elif event in ("error", "cancelled"):
             msg = ev.get("error", "")
-            self.status.setStyleSheet(
-                f"color:{theme.RED}; background:transparent; border:none;")
+            theme.retag(self.status, "err")
             if event == "cancelled":
                 self.status.setText(msg or "已取消")
             else:
                 self.status.setText(f"失败：{msg}")
             self.bar.setRange(0, 100)
+            self._set_log_visible(True)
             self._finish_ui()
             self._refresh_resume()
 

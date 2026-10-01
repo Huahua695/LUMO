@@ -17,9 +17,8 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-APP = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app")
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, APP)
+sys.path.insert(0, ROOT)
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PySide6.QtCore import QCoreApplication  # noqa: E402
@@ -105,7 +104,7 @@ def probe(path):
 
 # ---------------- 单元测试 ----------------
 def t_utils():
-    from utils import sanitize_name, unique_path, human_size, filename_from_url
+    from app.utils import sanitize_name, unique_path, human_size, filename_from_url
     expect = "a_b_c" + "_" * 7
     assert sanitize_name('a/b\\c:*?"<>|') == expect, \
         f"sanitize: {sanitize_name('a/b\\c:*?\"<>|')!r} != {expect!r}"
@@ -120,7 +119,7 @@ def t_utils():
 
 
 def t_url_detect():
-    from url_detect import detect_engine
+    from app.url_detect import detect_engine
     assert detect_engine("http://a/x/index.m3u8?token=1") == "m3u8"
     assert detect_engine("http://a/x.mpd") == "m3u8"
     assert detect_engine("https://a.com/v/a.mp4") == "direct"
@@ -130,8 +129,8 @@ def t_url_detect():
 
 
 def t_plans():
-    from enhance import plan_for
-    from paths import realesrgan_model
+    from app.enhance import plan_for
+    from app.paths import realesrgan_model
     has_general = os.path.isfile(realesrgan_model("realesr-general-x4v3"))
     assert plan_for("photo", 2, False) == ("realesrgan-x4plus", 4, 0.5)
     assert plan_for("photo", 3, False) == ("realesrgan-x4plus", 4, 0.75)
@@ -148,7 +147,7 @@ def t_plans():
 
 
 def t_even_vf():
-    from enhance import even_vf
+    from app.enhance import even_vf
     # 641(奇数) x2: 输出应为偶数
     import subprocess
     vf = even_vf(1.0)
@@ -158,7 +157,7 @@ def t_even_vf():
 
 
 def t_sleep_guard():
-    from sleep_guard import acquire, release, active
+    from app.sleep_guard import acquire, release, active
     acquire(); acquire()
     assert active()
     release(); release()
@@ -166,7 +165,7 @@ def t_sleep_guard():
 
 
 def t_job_descriptors():
-    from enhance import (write_job, mark_job, find_interrupted_jobs, clear_job,
+    from app.enhance import (write_job, mark_job, find_interrupted_jobs, clear_job,
                          job_file)
     d = tempfile.mkdtemp()
     tmp = os.path.join(d, ".sgtmp_9_1")
@@ -190,7 +189,7 @@ def t_job_descriptors():
 # ---------------- Range 续传集成测试 ----------------
 def t_direct_download_resume():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from direct_dl import DirectDownloadTask
+    from app.direct_dl import DirectDownloadTask
 
     payload = bytes(range(256)) * 8192  # 2 MB
     served = {"range_hits": 0}
@@ -240,7 +239,7 @@ def t_direct_download_resume():
 
 
 def t_direct_download_fresh_and_cancel():
-    from direct_dl import DirectDownloadTask
+    from app.direct_dl import DirectDownloadTask
     payload = bytes(range(256)) * 4096  # 1 MB
 
     class H(BaseHTTPRequestHandler):
@@ -269,7 +268,7 @@ def t_direct_download_fresh_and_cancel():
 
 # ---------------- 剪切集成测试 ----------------
 def t_cut_accurate():
-    from cut_engine import CutTask
+    from app.cut_engine import CutTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "src.mp4")
     gen_test_video(src, seconds=6)
@@ -284,7 +283,7 @@ def t_cut_accurate():
 
 
 def t_cut_lossless():
-    from cut_engine import CutTask
+    from app.cut_engine import CutTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "src.mp4")
     # 关键帧间隔 1 秒：无损剪切按关键帧对齐，正常片源下偏差应 < 1s
@@ -300,7 +299,7 @@ def t_cut_lossless():
 
 
 def t_parse_time():
-    from cut_engine import parse_time, fmt_time
+    from app.cut_engine import parse_time, fmt_time
     assert parse_time("83.5") == 83.5
     assert parse_time("1:23.5") == 83.5
     assert parse_time("1:00:04") == 3604.0
@@ -311,7 +310,7 @@ def t_parse_time():
 # ---------------- GPU 集成测试 ----------------
 def t_image_enhance_real_mode():
     """真人·通用模式图片（使用新转换的 general-x4v3 模型）"""
-    from enhance import EnhanceTask
+    from app.enhance import EnhanceTask
     from PIL import Image
     d = tempfile.mkdtemp()
     src = os.path.join(d, "in.png")
@@ -328,7 +327,7 @@ def t_image_enhance_real_mode():
 
 def t_video_enhance_anime_3x():
     """动漫视频 3 倍（v1.1 新路径，官方 -x3 权重）"""
-    from enhance import EnhanceTask
+    from app.enhance import EnhanceTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "v.mp4")
     gen_test_video(src, seconds=1, size="320x240")
@@ -344,7 +343,7 @@ def t_video_enhance_anime_3x():
 
 def t_video_enhance_resume():
     """★ 核心测试：视频增强中断 → 保留现场 → 恢复 → 成品"""
-    from enhance import EnhanceTask, ResumeTask, find_interrupted_jobs
+    from app.enhance import EnhanceTask, ResumeTask, find_interrupted_jobs
     d = tempfile.mkdtemp()
     src = os.path.join(d, "v.mp4")
     gen_test_video(src, seconds=2, size="320x240")  # 60 帧
@@ -447,7 +446,7 @@ def make_server(payload):
 
 
 def t_build_ytdlp_opts():
-    from ytdlp_dl import build_ytdlp_opts as B
+    from app.ytdlp_dl import build_ytdlp_opts as B
     assert B("best", "auto") == {"format": "bv*+ba/b"}
     assert B("720p", "auto") == {"format": "bv*[height<=720]+ba/b[height<=720]"}
     o = B("1080p", "mkv")
@@ -463,7 +462,7 @@ def t_build_ytdlp_opts():
 
 
 def t_dedupe_formats():
-    from ytdlp_dl import dedupe_formats
+    from app.ytdlp_dl import dedupe_formats
     raw = [
         {"format_id": "a1", "height": 720, "vcodec": "avc1", "tbr": 2000},
         {"format_id": "a2", "height": 720, "vcodec": "avc1", "tbr": 3500},
@@ -482,7 +481,7 @@ def t_dedupe_formats():
 
 
 def t_url_media_kind():
-    from url_detect import url_media_kind
+    from app.url_detect import url_media_kind
     assert url_media_kind("http://a/x.mp4") == "video"
     assert url_media_kind("http://a/x.FLAC") == "audio"
     assert url_media_kind("http://a/x.webp") == "image"
@@ -490,7 +489,7 @@ def t_url_media_kind():
 
 
 def t_extract_urls():
-    from url_detect import extract_urls
+    from app.url_detect import extract_urls
     text = ("看这个 https://www.bilibili.com/video/BV1xx411c7mD 好看\n"
             "http://a.com/v/1.mp4，http://a.com/v/2.mp4。\n"
             "重复 https://WWW.Bilibili.com/video/BV1xx411c7mD 以及 "
@@ -506,7 +505,7 @@ def t_extract_urls():
 
 def t_download_tab_batch():
     """★ 下载页批量粘贴：6 个 URL（含 1 个重复）→ 去重 5 个 → 3 并发自动排队"""
-    from download_tab import DownloadTab
+    from app.download_tab import DownloadTab
     payload = bytes(range(256)) * 512  # 128 KB
     srv = make_server(payload)
     try:
@@ -543,7 +542,7 @@ def t_download_tab_batch():
 
 def t_direct_convert_image():
     """直链 PNG 下载后转 JPG"""
-    from direct_dl import DirectDownloadTask
+    from app.direct_dl import DirectDownloadTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "pic.png")
     subprocess.run([FFMPEG, "-y", "-v", "error", "-f", "lavfi",
@@ -570,7 +569,7 @@ def t_direct_convert_image():
 
 def t_direct_convert_audio():
     """直链 MP4 下载后提取 MP3"""
-    from direct_dl import DirectDownloadTask
+    from app.direct_dl import DirectDownloadTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "clip.mp4")
     gen_test_video(src, seconds=1)
@@ -595,7 +594,7 @@ def t_direct_convert_audio():
 
 def t_extract_audio_mp3():
     """本地 MP4 全程提取 MP3"""
-    from cut_engine import CutTask
+    from app.cut_engine import CutTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "mv.mp4")
     gen_test_video(src, seconds=6)
@@ -616,7 +615,7 @@ def t_extract_audio_mp3():
 
 def t_extract_audio_m4a_range():
     """本地 MP4 指定片段（1s→4s）提取 M4A"""
-    from cut_engine import CutTask
+    from app.cut_engine import CutTask
     d = tempfile.mkdtemp()
     src = os.path.join(d, "mv.mp4")
     gen_test_video(src, seconds=6)

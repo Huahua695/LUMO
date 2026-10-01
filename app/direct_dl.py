@@ -5,9 +5,9 @@ import urllib.parse
 import urllib.request
 import urllib.error
 
-from base_task import BaseTask
-from media_convert import convert_media
-from utils import DEFAULT_UA, filename_from_url, unique_path, now_tag, sanitize_name
+from .base_task import BaseTask
+from .media_convert import convert_media
+from .utils import DEFAULT_UA, filename_from_url, unique_path, now_tag, sanitize_name
 
 CHUNK = 256 * 1024
 
@@ -133,7 +133,7 @@ class DirectDownloadTask(BaseTask):
         # 取消/失败时保留 .part 供下次续传；成功时上面已改名
 
 
-def _friendly(e) -> str:
+def _friendly(e: Exception) -> str:
     if isinstance(e, urllib.error.HTTPError):
         return f"服务器返回错误 {e.code}（{e.reason}）"
     if isinstance(e, urllib.error.URLError):

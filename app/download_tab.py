@@ -1,22 +1,25 @@
-"""下载页：粘贴链接 → 自动识别引擎 → 任务列表带进度。"""
+"""下载页：粘贴链接 → 自动识别引擎 → 任务列表两行式进度。"""
 import os
 import queue
 
-from PySide6.QtCore import QSize, Qt, Signal, QTimer
+from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel,
-    QPlainTextEdit, QListWidget, QListWidgetItem, QPushButton, QVBoxLayout,
-    QWidget, QProgressBar,
+    QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QListWidget,
+    QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )
 
-import theme
-from theme import elide
-from utils import human_size, human_speed, open_in_explorer
-from url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
-from paths import tools_ready
+from . import icons, theme
+from .theme import elide
+from .url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
+from .paths import tools_ready
+from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow
 
 MAX_CONCURRENT = 3
 MAX_BATCH = 50
+ROW_MIN_H = 66
+
+# 空状态的示例链接：B 站公开视频，走完整「解析卡片 → 下载」流程
+SAMPLE_URL = "https://www.bilibili.com/video/BV1GJ411x7h7/"
 
 QUALITY_ITEMS = [
     ("best", "最佳画质（推荐）"),
@@ -36,95 +39,6 @@ FMT_ITEMS = [
 ]
 
 
-class TaskRow(QWidget):
-    """任务列表中的一行。"""
-
-    cancel_clicked = Signal(int)
-
-    def __init__(self, task_id, parent=None):
-        super().__init__(parent)
-        self.task_id = task_id
-        self.bar = QProgressBar()
-        self.bar.setRange(0, 100)
-        self.bar.setValue(0)
-        self.bar.setFixedWidth(200)
-        self.bar.setTextVisible(False)
-
-        self.name_label = QLabel("准备中…")
-        self.name_label.setStyleSheet("font-weight:600; font-size:13px;")
-        self.name_label.setMinimumWidth(150)
-        self.meta_label = QLabel("")
-        self.meta_label.setObjectName("sub")
-
-        self.status_label = QLabel("排队中")
-        self.status_label.setObjectName("sub")
-        self.status_label.setMinimumWidth(130)
-
-        self.btn = QPushButton("取消")
-        self.btn.setProperty("danger", True)
-        self.btn.setFixedWidth(72)
-        self.btn.clicked.connect(lambda: self.cancel_clicked.emit(self.task_id))
-
-        lay = QHBoxLayout(self)
-        lay.setContentsMargins(12, 8, 12, 8)
-        lay.setSpacing(10)
-        col = QVBoxLayout()
-        col.setSpacing(3)
-        col.addWidget(self.name_label)
-        col.addWidget(self.meta_label)
-        lay.addLayout(col, 1)
-        lay.addWidget(self.bar)
-        lay.addWidget(self.status_label)
-        lay.addWidget(self.btn)
-
-    def set_state(self, **kw):
-        if "name" in kw and kw["name"]:
-            self.name_label.setText(elide(kw["name"], 30))
-            self.name_label.setToolTip(kw["name"])
-        if "engine" in kw:
-            self.meta_label.setText(kw["engine"])
-        if "pct" in kw:
-            pct = kw["pct"]
-            if pct is None:
-                self.bar.setRange(0, 0)
-            else:
-                self.bar.setRange(0, 100)
-                self.bar.setValue(int(pct))
-        parts = []
-        if kw.get("stage"):
-            parts.append(kw["stage"])
-        if kw.get("total"):
-            parts.append(f"{human_size(kw.get('done'))} / {human_size(kw['total'])}")
-        elif kw.get("done"):
-            parts.append(human_size(kw["done"]))
-        if kw.get("fps") is not None:
-            parts.append(f"{kw['fps']:.1f} 帧/秒")
-        if kw.get("speed"):
-            parts.append(human_speed(kw["speed"]))
-        if parts:
-            self.status_label.setText("  ·  ".join(parts))
-        if kw.get("text"):
-            self.status_label.setText(kw["text"])
-
-    def finish(self, ok=True, text=None):
-        self.bar.setRange(0, 100)
-        self.bar.setValue(100 if ok else self.bar.value())
-        self.status_label.setObjectName("ok" if ok else "err")
-        self.status_label.setStyleSheet(
-            f"color:{theme.GREEN if ok else theme.RED}; font-weight:600;"
-            "background:transparent; border:none;")
-        self.status_label.setText(text or ("已完成 ✓" if ok else "失败"))
-        self.btn.setText("打开")
-        self.btn.setProperty("danger", False)
-        self.btn.setProperty("ghost", True)
-        self.btn.style().unpolish(self.btn)
-        self.btn.style().polish(self.btn)
-        try:
-            self.cancel_clicked.disconnect()
-        except (TypeError, RuntimeError):
-            pass
-
-
 class DownloadTab(QWidget):
     def __init__(self, settings, parent=None):
         super().__init__(parent)
@@ -134,22 +48,18 @@ class DownloadTab(QWidget):
         self.next_id = 1
         self.pending = queue.Queue()
         self.active = 0
+        self._probe_has_quality = False  # 解析卡片已给出画质选项（外层画质可隐藏）
 
         root = QVBoxLayout(self)
         root.setContentsMargins(28, 22, 28, 18)
         root.setSpacing(14)
 
         # ---- 卡片1：链接与保存位置 ----
-        c1 = QFrame(objectName="card")
-        v1 = QVBoxLayout(c1)
-        v1.setContentsMargins(24, 18, 24, 18)
-        v1.setSpacing(10)
-        t = QLabel("下载资源")
-        t.setObjectName("h1")
+        c1 = SectionCard("下载资源", title_style="h1")
+        v1 = c1.body
         s = QLabel("支持网站链接（B站 / YouTube / 抖音等）、m3u8/HLS、文件直链，原始数据无损保存。")
         s.setObjectName("sub")
         s.setWordWrap(True)
-        v1.addWidget(t)
         v1.addWidget(s)
 
         row = QHBoxLayout()
@@ -172,18 +82,15 @@ class DownloadTab(QWidget):
         v1.addWidget(self.detect_label)
 
         # ---- 解析预览卡片（单条网站链接时自动后台解析） ----
-        self.probe_card = QFrame()
-        self.probe_card.setStyleSheet(
-            f"QFrame {{ background:#f7faff; border:1px solid {theme.BORDER};"
-            f" border-radius:10px; }}")
+        self.probe_card = QFrame(objectName="probeCard")
         pl = QHBoxLayout(self.probe_card)
         pl.setContentsMargins(10, 8, 10, 8)
         pl.setSpacing(12)
-        self.thumb_label = QLabel("🖼")
+        self.thumb_label = QLabel()
+        self.thumb_label.setObjectName("thumb")
         self.thumb_label.setFixedSize(112, 60)
         self.thumb_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.thumb_label.setStyleSheet(
-            "background:#e8edf5; border:none; border-radius:6px; font-size:22px;")
+        self._thumb_is_placeholder = True
         pl.addWidget(self.thumb_label)
         pcol = QVBoxLayout()
         pcol.setSpacing(3)
@@ -215,6 +122,7 @@ class DownloadTab(QWidget):
         self.probe_status.setObjectName("sub")
         self.probe_status.setFixedWidth(150)
         self.probe_status.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.probe_status.setWordWrap(True)
         pl.addWidget(self.probe_status)
         self.probe_card.setVisible(False)
         v1.addWidget(self.probe_card)
@@ -230,21 +138,26 @@ class DownloadTab(QWidget):
         self._probe_timer.setInterval(900)
         self._probe_timer.timeout.connect(self._start_probe)
 
-        # ---- 保存设置：画质/分辨率 + 保存格式 ----
+        # ---- 保存设置：保存格式常驻；外层画质仅批量/解析无画质时显示 ----
         srow2 = QHBoxLayout()
+        self.quality_group = QWidget()
+        qgl = QHBoxLayout(self.quality_group)
+        qgl.setContentsMargins(0, 0, 0, 0)
+        qgl.setSpacing(8)
         lblq = QLabel("画质 / 分辨率")
         lblq.setObjectName("h2")
         self.quality = QComboBox()
         for data, text in QUALITY_ITEMS:
             self.quality.addItem(text, data)
+        qgl.addWidget(lblq)
+        qgl.addWidget(self.quality)
         lblf = QLabel("保存格式")
         lblf.setObjectName("h2")
         self.fmt = QComboBox()
         self.fmt.addItem(FMT_ITEMS[0][1], "auto")
         self.save_hint = QLabel("粘贴链接后，这里会给出可选的画质与格式。")
         self.save_hint.setObjectName("sub")
-        srow2.addWidget(lblq)
-        srow2.addWidget(self.quality)
+        srow2.addWidget(self.quality_group)
         srow2.addSpacing(28)
         srow2.addWidget(lblf)
         srow2.addWidget(self.fmt)
@@ -261,30 +174,14 @@ class DownloadTab(QWidget):
                 self.quality.setCurrentIndex(i)
                 break
 
-        line = QFrame()
+        line = QFrame(objectName="hr")
         line.setFixedHeight(1)
-        line.setStyleSheet(f"background:{theme.BORDER}; border:none;")
         v1.addWidget(line)
 
-        srow = QHBoxLayout()
-        srow.setSpacing(8)
-        lbl = QLabel("保存位置")
-        lbl.setObjectName("h2")
-        self.dir_label = QLabel()
-        self.dir_label.setObjectName("sub")
-        self.dir_label.setText(elide(self.settings.save_dir, 52))
-        self.dir_label.setToolTip(self.settings.save_dir)
-        b1 = QPushButton("更改…")
-        b1.setProperty("ghost", True)
-        b1.clicked.connect(self._pick_dir)
-        b2 = QPushButton("打开文件夹")
-        b2.setProperty("ghost", True)
-        b2.clicked.connect(lambda: open_in_explorer(self.settings.save_dir))
-        srow.addWidget(lbl)
-        srow.addWidget(self.dir_label, 1)
-        srow.addWidget(b1)
-        srow.addWidget(b2)
-        v1.addLayout(srow)
+        self.path_row = PathRow("保存位置",
+                                lambda: self.settings.save_dir,
+                                lambda d: setattr(self.settings, "save_dir", d))
+        v1.addLayout(self.path_row)
 
         drow = QHBoxLayout()
         drow.setSpacing(8)
@@ -302,19 +199,14 @@ class DownloadTab(QWidget):
         root.addWidget(c1)
 
         # ---- 卡片2：任务列表 ----
-        c2 = QFrame(objectName="card")
-        v2 = QVBoxLayout(c2)
-        v2.setContentsMargins(24, 18, 24, 18)
-        v2.setSpacing(8)
+        c2 = SectionCard("任务列表", title_style="h2", spacing=8)
+        v2 = c2.body
         h = QHBoxLayout()
-        t2 = QLabel("任务列表")
-        t2.setObjectName("h2")
         self.summary = QLabel("")
         self.summary.setObjectName("sub")
         clear = QPushButton("清除记录")
         clear.setProperty("ghost", True)
         clear.clicked.connect(self._clear_finished)
-        h.addWidget(t2)
         h.addStretch(1)
         h.addWidget(self.summary)
         h.addWidget(clear)
@@ -323,15 +215,30 @@ class DownloadTab(QWidget):
         self.list.setSpacing(4)
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list.setMinimumHeight(100)
-        v2.addWidget(self.list)
-        self.empty_hint = QLabel("还没有任务 —— 粘贴链接后点「开始下载」，进度会显示在这里"
-                                 "（最多同时 3 个，完成后点任务右侧「打开」定位文件）")
-        self.empty_hint.setObjectName("sub")
-        self.empty_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_hint.setContentsMargins(0, 12, 0, 12)
-        self.empty_hint.setWordWrap(True)
-        v2.addWidget(self.empty_hint)
+        v2.addWidget(self.list, 1)
+        # 空状态：图标 + 引导 + 示例链接，与任务列表互斥显示
+        self.empty_state = EmptyState(
+            "download",
+            "还没有任务 —— 粘贴链接后点「开始下载」，进度会显示在这里\n"
+            "（最多同时 3 个，完成后点任务右侧「打开」定位文件）",
+            button_text="粘贴示例链接", on_click=self._fill_sample)
+        v2.addWidget(self.empty_state, 1)
         root.addWidget(c2, 1)
+
+        self._refresh_theme_bits()
+        theme.on_theme_changed(self._refresh_theme_bits)
+        self._refresh_summary()
+
+    # ---------- 主题相关自绘元素 ----------
+    def _set_thumb_placeholder(self):
+        pm = icons.pixmap_for(self, "image", theme.current()["sub"], 26)
+        if pm is not None:
+            self.thumb_label.setPixmap(pm)
+            self._thumb_is_placeholder = True
+
+    def _refresh_theme_bits(self):
+        if self._thumb_is_placeholder:
+            self._set_thumb_placeholder()
 
     # ---------- 交互 ----------
     def _paste(self):
@@ -346,6 +253,9 @@ class DownloadTab(QWidget):
             self.url_edit.setPlainText(cb.text().strip())
         self.url_edit.verticalScrollBar().setValue(
             self.url_edit.verticalScrollBar().maximum())
+
+    def _fill_sample(self):
+        self.url_edit.setPlainText(SAMPLE_URL)
 
     def _urls(self):
         return extract_urls(self.url_edit.toPlainText())[:MAX_BATCH]
@@ -382,6 +292,7 @@ class DownloadTab(QWidget):
             self._probe_task.cancel()
             self._probe_task.wait(2000)
         self._probe_task = None
+        self._probe_has_quality = False
 
     def _start_probe(self):
         urls = self._urls()
@@ -397,18 +308,18 @@ class DownloadTab(QWidget):
         self._probe_url = urls[0]
         self._probe_format_id = None
         self._probe_entries = None
-        from ytdlp_dl import ProbeTask
+        from .ytdlp_dl import ProbeTask
         self._probe_task = ProbeTask(self._probe_task_id, urls[0])
         self._probe_task.sig.connect(self._on_probe_event)
         self.probe_title.setText("")
         self.probe_meta.setText("")
-        self.probe_status.setStyleSheet("")
+        theme.retag(self.probe_status, "sub")
         self.probe_status.setText("正在解析…")
         self.probe_quality.clear()
         self.probe_qlabel.setVisible(False)
         self.probe_quality.setVisible(False)
         self.probe_btn.setVisible(False)
-        self.thumb_label.setText("🖼")
+        self._set_thumb_placeholder()
         self.probe_card.setVisible(True)
         self._probe_task.start()
 
@@ -428,12 +339,12 @@ class DownloadTab(QWidget):
                 self._show_video_probe(ev)
         elif event == "error":
             self.probe_status.setText("解析失败\n可直接下载")
-            self.probe_status.setStyleSheet(
-                f"color:{theme.RED}; background:transparent; border:none;")
+            theme.retag(self.probe_status, "err")
             self.probe_title.setText(elide(ev.get("error", "解析失败"), 52))
+        self._refresh_save_options()
 
     def _show_video_probe(self, ev):
-        from cut_engine import fmt_time
+        from .cut_engine import fmt_time
         from PySide6.QtGui import QPixmap
         self.probe_card.setVisible(True)
         thumb = ev.get("thumbnail") or ""
@@ -443,6 +354,7 @@ class DownloadTab(QWidget):
                 self.thumb_label.setPixmap(pm.scaled(
                     128, 72, Qt.AspectRatioMode.KeepAspectRatio,
                     Qt.TransformationMode.SmoothTransformation))
+                self._thumb_is_placeholder = False
         self.probe_title.setText(elide(ev.get("title") or "未知标题", 52))
         meta = []
         if ev.get("uploader"):
@@ -452,9 +364,8 @@ class DownloadTab(QWidget):
         fmts = ev.get("formats") or []
         meta.append(f"{len(fmts)} 种画质" if fmts else "画质信息不可用")
         self.probe_meta.setText(" · ".join(meta))
+        theme.retag(self.probe_status, "ok")
         self.probe_status.setText("✓ 解析成功")
-        self.probe_status.setStyleSheet(
-            f"color:{theme.GREEN}; background:transparent; border:none;")
         self.probe_quality.blockSignals(True)
         self.probe_quality.clear()
         self.probe_quality.addItem("最佳（推荐）", None)
@@ -497,9 +408,13 @@ class DownloadTab(QWidget):
 
     def _refresh_save_options(self):
         urls = self._urls()
-        # 画质可用性：仅当全部链接都是网站视频且未选音频格式时可调
         all_site = bool(urls) and all(detect_engine(u) == "site" for u in urls)
         audio_fmt = self.fmt.currentData() in ("mp3", "m4a")
+        # 单条网站链接且解析卡片已给出画质时，外层画质下拉隐藏（画质只在解析卡片里选）
+        single_site_probe = self._probe_has_quality and len(urls) == 1
+        show_quality = bool(urls) and all_site and not audio_fmt \
+            and not single_site_probe
+        self.quality_group.setVisible(show_quality)
         self.quality.setEnabled(all_site and not audio_fmt)
 
         # 保存格式可选项：批量时取所有链接可选项的交集
@@ -589,20 +504,35 @@ class DownloadTab(QWidget):
                 tip = "（JPG 为有损压缩）" if f == "jpg" else "（PNG 无损）"
                 self.save_hint.setText(f"下载后转换为 {f.upper()} 图片{tip}")
 
-    def _pick_dir(self):
-        d = QFileDialog.getExistingDirectory(self, "选择保存位置", self.settings.save_dir)
-        if d:
-            self.settings.save_dir = d
-            self.dir_label.setText(elide(d, 52))
-            self.dir_label.setToolTip(d)
+    def _take_row(self, row):
+        for i in range(self.list.count()):
+            it = self.list.item(i)
+            if it and self.list.itemWidget(it) is row:
+                self.list.takeItem(i)
+                return
 
     def _clear_finished(self):
+        # 已结束（完成/失败/取消）的任务行
         for tid in [tid for tid, t in self.threads.items() if t.isFinished()]:
             row = self.rows.pop(tid, None)
-            for it in list(self.list.items()):
-                if it and self.list.itemWidget(it) is row:
-                    self.list.takeItem(self.list.row(it))
+            if row:
+                self._take_row(row)
             self.threads.pop(tid, None)
+        # 丢弃 pending 里已无对应任务/已被取消的残留条目，避免槽位空出后隐形启动
+        kept = []
+        while True:
+            try:
+                entry = self.pending.get_nowait()
+            except queue.Empty:
+                break
+            th = self.threads.get(entry[0])
+            if th is not None and entry[0] in self.rows and not th._cancelled:
+                kept.append(entry)
+            else:
+                self.threads.pop(entry[0], None)
+        for entry in kept:
+            self.pending.put(entry)
+        self._refresh_summary()
 
     # ---------- 启动任务 ----------
     def _start(self):
@@ -623,17 +553,16 @@ class DownloadTab(QWidget):
     def _spawn(self, eng, url):
         tid = self.next_id
         self.next_id += 1
-
         if eng == "direct":
-            from direct_dl import DirectDownloadTask
+            from .direct_dl import DirectDownloadTask
             th = DirectDownloadTask(tid, url, self.settings.save_dir,
                                     fmt=self.fmt.currentData())
         elif eng == "m3u8":
-            from m3u8_dl import M3u8DownloadTask
+            from .m3u8_dl import M3u8DownloadTask
             th = M3u8DownloadTask(tid, url, self.settings.save_dir,
                                   fmt=self.fmt.currentData())
         else:
-            from ytdlp_dl import YtdlpTask
+            from .ytdlp_dl import YtdlpTask
             format_id = None
             if (eng == "site" and self._probe_url == url
                     and self.fmt.currentData() not in ("mp3", "m4a")):
@@ -643,11 +572,12 @@ class DownloadTab(QWidget):
                            fmt=self.fmt.currentData(), format_id=format_id)
 
         item = QListWidgetItem()
-        row = TaskRow(tid)
+        row = TaskProgressRow(tid)
+        row.folder = self.settings.save_dir
         row.set_state(engine=ENGINE_LABEL[eng], pct=None, text="排队中")
-        row.cancel_clicked.connect(self._cancel)
+        row.action_clicked.connect(self._cancel)
         item.setSizeHint(QSize(self.list.viewport().width() - 10,
-                               max(56, row.sizeHint().height())))
+                               max(ROW_MIN_H, row.sizeHint().height())))
         self.list.addItem(item)
         self.list.setItemWidget(item, row)
 
@@ -665,8 +595,28 @@ class DownloadTab(QWidget):
 
     def _cancel(self, tid):
         th = self.threads.get(tid)
-        if th:
-            th.cancel()
+        if th is None:
+            return
+        if not th.isRunning() and not th.isFinished():
+            # 仍在排队、从未启动：直接移除，避免槽位空出后隐形运行
+            kept = []
+            while True:
+                try:
+                    entry = self.pending.get_nowait()
+                except queue.Empty:
+                    break
+                if entry[0] != tid:
+                    kept.append(entry)
+            for entry in kept:
+                self.pending.put(entry)
+            row = self.rows.pop(tid, None)
+            if row is not None:
+                self._take_row(row)
+            self.threads.pop(tid, None)
+            th.deleteLater()
+            self._refresh_summary()
+            return
+        th.cancel()
 
     # ---------- 事件 ----------
     def _on_event(self, ev):
@@ -684,7 +634,8 @@ class DownloadTab(QWidget):
                           stage=ev.get("stage"))
         elif event == "done":
             note = ev.get("note") or ""
-            row.finish(True, "已完成 ✓" + (f" · {note}" if note else ""))
+            row.finish(True, "已完成 ✓" + (f" · {note}" if note else ""),
+                       open_path=ev.get("path") or "")
             row.set_state(pct=100)
             self._on_thread_end(tid)
         elif event == "cancelled":
@@ -706,13 +657,23 @@ class DownloadTab(QWidget):
         # 取一个排队任务
         while self.active < MAX_CONCURRENT:
             try:
-                _tid, eng, url = self.pending.get_nowait()
+                _tid, _eng, _url = self.pending.get_nowait()
             except queue.Empty:
                 break
+            th2 = self.threads.get(_tid)
             row = self.rows.get(_tid)
-            if row:
-                row.set_state(pct=None, text="准备中")
-                self.threads[_tid].start()
+            if th2 is None:
+                continue
+            if row is None or th2._cancelled or th2.isRunning():
+                # 行已被清除或任务已被取消：丢弃，不启动
+                self.threads.pop(_tid, None)
+                th2.deleteLater()
+                if row is not None:
+                    self.rows.pop(_tid, None)
+                    self._take_row(row)
+                continue
+            row.set_state(pct=None, text="准备中")
+            th2.start()
             self.active += 1
         self._refresh_summary()
 
@@ -729,9 +690,11 @@ class DownloadTab(QWidget):
             it = self.list.item(i)
             r = self.list.itemWidget(it)
             if r is not None:
-                it.setSizeHint(QSize(w, max(56, r.sizeHint().height())))
+                it.setSizeHint(QSize(w, max(ROW_MIN_H, r.sizeHint().height())))
 
     def _refresh_summary(self):
         n_run = sum(1 for t in self.threads.values() if t.isRunning())
         self.summary.setText(f"进行中 {n_run} · 排队 {self.pending.qsize()}")
-        self.empty_hint.setVisible(self.list.count() == 0)
+        has_rows = self.list.count() > 0
+        self.list.setVisible(has_rows)
+        self.empty_state.setVisible(not has_rows)

@@ -20,7 +20,7 @@ class AppSettings:
 
     @property
     def save_dir(self) -> str:
-        d = self.q.value("download/save_dir", _default_save_dir())
+        d = str(self.q.value("download/save_dir", _default_save_dir()))
         return d or _default_save_dir()
 
     @save_dir.setter
@@ -29,7 +29,7 @@ class AppSettings:
 
     @property
     def enhance_dir(self) -> str:
-        d = self.q.value("enhance/out_dir", _default_enhance_dir())
+        d = str(self.q.value("enhance/out_dir", _default_enhance_dir()))
         return d or _default_enhance_dir()
 
     @enhance_dir.setter
@@ -38,7 +38,7 @@ class AppSettings:
 
     @property
     def dl_quality(self) -> str:
-        return self.q.value("download/quality", "best") or "best"
+        return str(self.q.value("download/quality", "best") or "best")
 
     @dl_quality.setter
     def dl_quality(self, v: str):
@@ -46,8 +46,17 @@ class AppSettings:
 
     @property
     def dl_format(self) -> str:
-        return self.q.value("download/format", "auto") or "auto"
+        return str(self.q.value("download/format", "auto") or "auto")
 
     @dl_format.setter
     def dl_format(self, v: str):
         self.q.setValue("download/format", v)
+
+    @property
+    def theme(self) -> str:
+        v = str(self.q.value("appearance/theme", "system") or "system")
+        return v if v in ("system", "light", "dark") else "system"
+
+    @theme.setter
+    def theme(self, v: str):
+        self.q.setValue("appearance/theme", v)

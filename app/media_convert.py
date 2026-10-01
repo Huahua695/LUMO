@@ -6,10 +6,9 @@
 import os
 import subprocess
 
-from paths import ffmpeg
-from utils import unique_path
-
-CREATE_NO_WINDOW = 0x08000000
+from .paths import ffmpeg
+from .proc import CREATE_NO_WINDOW, stderr_target
+from .utils import unique_path
 
 # 目标格式 -> (扩展名, 无损可能)
 TARGETS = {
@@ -22,12 +21,13 @@ TARGETS = {
 }
 
 
-def _run(cmd):
+def _run(cmd: list) -> "subprocess.CompletedProcess[bytes]":
+    # ffmpeg 的报错细节落滚动日志（app/proc.py），界面只提示成败
     return subprocess.run(cmd, creationflags=CREATE_NO_WINDOW,
-                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                          stdout=subprocess.DEVNULL, stderr=stderr_target())
 
 
-def convert_media(src, fmt, out_dir):
+def convert_media(src: str, fmt: str, out_dir: str) -> tuple[str, str]:
     """把 src 转换为目标格式。返回 (最终路径, 说明)。
     失败时返回 (原路径, 失败原因)——调用方应把原件交给用户。"""
     fmt = (fmt or "auto").lower()

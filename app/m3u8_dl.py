@@ -6,13 +6,13 @@ import subprocess
 import threading
 import time
 
-from base_task import BaseTask
-from paths import m3u8dl_exe
-from utils import now_tag
-from media_convert import convert_media
+from .base_task import BaseTask
+from .paths import m3u8dl_exe
+from .proc import CREATE_NO_WINDOW, stderr_target
+from .utils import now_tag
+from .media_convert import convert_media
 
 PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
-CREATE_NO_WINDOW = 0x08000000
 
 RESULT_EXTS = (".mp4", ".mkv", ".ts", ".flv", ".m4a", ".aac")
 
@@ -42,7 +42,7 @@ class M3u8DownloadTask(BaseTask):
         last_emit = [0.0]
         try:
             self._proc = subprocess.Popen(
-                cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                cmd, stdout=subprocess.PIPE, stderr=stderr_target(),
                 creationflags=CREATE_NO_WINDOW,
             )
             self._emit(event="started", name=save_name)
@@ -90,7 +90,7 @@ class M3u8DownloadTask(BaseTask):
             self.error(str(e) or e.__class__.__name__)
 
 
-def _find_result(save_dir, save_name):
+def _find_result(save_dir: str, save_name: str) -> str:
     cand = os.path.join(save_dir, save_name + ".mp4")
     if os.path.isfile(cand):
         return cand
@@ -98,7 +98,7 @@ def _find_result(save_dir, save_name):
         p = os.path.join(save_dir, save_name + ext)
         if os.path.isfile(p):
             return p
-    best, best_t = "", 0
+    best, best_t = "", 0.0
     for root, _dirs, files in os.walk(save_dir):
         for fn in files:
             if fn.lower().endswith(RESULT_EXTS):

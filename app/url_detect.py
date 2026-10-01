@@ -1,7 +1,7 @@
 """识别粘贴的链接应该交给哪个引擎处理。"""
 import re
 
-from utils import DIRECT_EXTS, IMAGE_EXTS, VIDEO_EXTS
+from .utils import DIRECT_EXTS, IMAGE_EXTS, VIDEO_EXTS
 from urllib.parse import unquote, urlparse
 
 AUDIO_EXTS = DIRECT_EXTS - IMAGE_EXTS - VIDEO_EXTS

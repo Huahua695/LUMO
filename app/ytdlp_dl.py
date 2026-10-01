@@ -4,23 +4,23 @@ import os
 import tempfile
 import time
 
-from base_task import BaseTask
-from paths import tools_dir
-from utils import DEFAULT_UA
+from .base_task import BaseTask
+from .paths import tools_dir
+from .utils import DEFAULT_UA
 
 QUALITY_HEIGHTS = {"1080p": 1080, "720p": 720, "480p": 480}
 AUDIO_FORMATS = ("mp3", "m4a")
 MAX_PLAYLIST = 100
 
 
-def build_ytdlp_opts(quality, fmt, format_id=None):
+def build_ytdlp_opts(quality: str, fmt: str, format_id=None) -> dict:
     """(画质, 保存格式, 具体画质ID) -> yt-dlp 关键选项 dict。纯函数，便于测试。
 
     quality: best | 1080p | 720p | 480p | audio
     fmt:     auto | mp4 | mkv | mp3 | m4a
     format_id: 解析卡片选中的具体画质（优先级高于 quality 预设）
     """
-    opts = {}
+    opts: dict = {}
     audio_codec = fmt if fmt in AUDIO_FORMATS else None
     if quality == "audio" or audio_codec:
         # 仅音频：选最佳音轨，再用 ffmpeg 提取/转码
@@ -45,10 +45,10 @@ def build_ytdlp_opts(quality, fmt, format_id=None):
     return opts
 
 
-def dedupe_formats(raw_formats):
+def dedupe_formats(raw_formats) -> list[dict]:
     """把 yt-dlp 的 formats 列表整理成按高度去重的画质选项（每档取最高码率）。
     返回 [{format_id, label, size}]，按高度降序。纯函数，便于测试。"""
-    best_by_height = {}
+    best_by_height: dict = {}
     for f in raw_formats or []:
         if not isinstance(f, dict):
             continue
@@ -71,7 +71,7 @@ def dedupe_formats(raw_formats):
     return out
 
 
-def _download_thumbnail(url):
+def _download_thumbnail(url: str) -> str:
     """下载封面到临时文件，失败返回 ''。"""
     if not url:
         return ""
@@ -96,7 +96,7 @@ class ProbeTask(BaseTask):
 
     def run(self):
         import yt_dlp
-        opts = {
+        opts: dict = {
             "quiet": True,
             "no_warnings": True,
             "noplaylist": False,
@@ -119,10 +119,10 @@ class ProbeTask(BaseTask):
             return
         if info.get("_type") == "playlist":
             entries = []
-            for e in (info.get("entries") or []):
-                u = e.get("url") or e.get("webpage_url")
+            for entry in (info.get("entries") or []):
+                u = entry.get("url") or entry.get("webpage_url")
                 if u:
-                    entries.append({"title": e.get("title") or "", "url": u})
+                    entries.append({"title": entry.get("title") or "", "url": u})
                 if len(entries) >= MAX_PLAYLIST:
                     break
             if not entries:
@@ -189,7 +189,7 @@ class YtdlpTask(BaseTask):
             if throttle():
                 self.progress(None, stage=f"后处理：{d.get('postprocessor', '')}")
 
-        opts = {
+        opts: dict = {
             "format": "bv*+ba/b",
             "outtmpl": os.path.join(self.save_dir, "%(title).100s.%(ext)s"),
             "paths": {"home": self.save_dir},
@@ -234,8 +234,8 @@ class YtdlpTask(BaseTask):
             self.error(str(e) or e.__class__.__name__)
 
 
-def _newest_file(folder, min_t):
-    best, best_t = "", 0
+def _newest_file(folder: str, min_t: float) -> str:
+    best, best_t = "", 0.0
     for fn in os.listdir(folder):
         p = os.path.join(folder, fn)
         if os.path.isfile(p) and not fn.endswith(".part"):

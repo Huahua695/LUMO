@@ -5,14 +5,13 @@ import subprocess
 import threading
 import time
 
-from base_task import BaseTask
-from paths import ffmpeg, ffprobe
-from utils import unique_path, sanitize_name
+from .base_task import BaseTask
+from .paths import ffmpeg, ffprobe
+from .proc import CREATE_NO_WINDOW, stderr_target
+from .utils import unique_path, sanitize_name
 
-CREATE_NO_WINDOW = 0x08000000
 
-
-def probe_duration(src):
+def probe_duration(src: str) -> tuple[float, tuple[int, int], bool]:
     """返回 (时长秒, 视频宽高, 是否有音频轨)。失败时 (0, (0,0), False)。"""
     try:
         r = subprocess.run(
@@ -34,7 +33,7 @@ def probe_duration(src):
         return 0.0, (0, 0), False
 
 
-def parse_time(text):
+def parse_time(text: str) -> float | None:
     """'83.5' / '1:23.5' / '1:23:04' -> 秒；失败返回 None。"""
     text = (text or "").strip()
     if not text:
@@ -53,7 +52,7 @@ def parse_time(text):
         return None
 
 
-def fmt_time(sec):
+def fmt_time(sec: float) -> str:
     sec = max(0.0, float(sec))
     m, s = divmod(sec, 60)
     h, m = divmod(int(m), 60)
@@ -62,7 +61,7 @@ def fmt_time(sec):
     return f"{m:02d}:{s:05.2f}"
 
 
-def fmt_time_file(sec):
+def fmt_time_file(sec: float) -> str:
     """文件名安全版（Windows 文件名不能含冒号）。"""
     sec = max(0.0, float(sec))
     m, s = divmod(sec, 60)
@@ -139,13 +138,17 @@ class CutTask(BaseTask):
                               "-movflags", "+faststart"]
         cmd += ["-progress", "pipe:1", "-nostats", out]
 
-        self._proc = subprocess.Popen(
+        proc = subprocess.Popen(
             cmd, creationflags=CREATE_NO_WINDOW,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            stdout=subprocess.PIPE, stderr=stderr_target())
+        self._proc = proc
+        pipe = proc.stdout
 
         def pump():
+            if pipe is None:
+                return
             last = 0.0
-            for raw in iter(self._proc.stdout.readline, b""):
+            for raw in iter(pipe.readline, b""):
                 line = raw.decode("utf-8", errors="ignore").strip()
                 m = re.match(r"out_time_(us|ms)=(\d+)", line)
                 if not m or duration <= 0:
@@ -162,7 +165,7 @@ class CutTask(BaseTask):
         try:
             t = threading.Thread(target=pump, daemon=True)
             t.start()
-            rc = self._proc.wait()
+            rc = proc.wait()
             t.join(timeout=2)
             if self._cancelled:
                 self.error("已取消", cancelled=True)

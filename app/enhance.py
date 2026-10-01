@@ -8,11 +8,11 @@ import shutil
 import subprocess
 import time
 
-from base_task import BaseTask
-from paths import ffmpeg, ffprobe, realesrgan_exe, realesrgan_model
-from utils import IMAGE_EXTS, VIDEO_EXTS, unique_path
+from .base_task import BaseTask
+from .paths import ffmpeg, ffprobe, realesrgan_exe, realesrgan_model
+from .proc import CREATE_NO_WINDOW, stderr_target
+from .utils import IMAGE_EXTS, VIDEO_EXTS, unique_path
 
-CREATE_NO_WINDOW = 0x08000000
 JOB_PREFIX = ".sgjob_"
 
 # 图片模式 -> 4倍质量模型（低于4倍的倍数用「放大后精细缩回」实现）
@@ -22,7 +22,7 @@ IMAGE_MODELS = {
 }
 
 
-def plan_for(mode, scale, is_video):
+def plan_for(mode: str, scale: int, is_video: bool) -> tuple[str, int, float]:
     scale = int(scale)
     if is_video:
         if mode == "anime":
@@ -45,7 +45,7 @@ def plan_for(mode, scale, is_video):
     return (model, 4, scale / 4.0)
 
 
-def even_vf(eff):
+def even_vf(eff: float) -> str:
     """输出缩放：eff 相对模型输出帧的系数；并保证宽高为偶数（yuv420p 要求）。"""
     return (f"scale=trunc(iw*{eff}/2)*2:trunc(ih*{eff}/2)*2"
             f":flags=lanczos")
@@ -57,12 +57,13 @@ class CancelledError(Exception):
 
 # ---------------- 任务档案（断点续跑） ----------------
 
-def job_file(out_dir, task_id):
+def job_file(out_dir: str, task_id) -> str:
     return os.path.join(out_dir, f"{JOB_PREFIX}{task_id}.json")
 
 
-def write_job(out_dir, task_id, source, mode, scale, tmp_name, fps, total,
-              status="running"):
+def write_job(out_dir: str, task_id, source: str, mode: str, scale: int,
+              tmp_name: str, fps: float, total: int,
+              status: str = "running") -> None:
     data = {
         "kind": "video",
         "source": os.path.abspath(source),
@@ -79,7 +80,7 @@ def write_job(out_dir, task_id, source, mode, scale, tmp_name, fps, total,
         json.dump(data, f, ensure_ascii=False, indent=1)
 
 
-def mark_job(out_dir, task_id, status):
+def mark_job(out_dir: str, task_id, status: str) -> None:
     p = job_file(out_dir, task_id)
     if not os.path.isfile(p):
         return
@@ -95,7 +96,7 @@ def mark_job(out_dir, task_id, status):
         pass
 
 
-def clear_job(out_dir, task_id):
+def clear_job(out_dir: str, task_id) -> None:
     p = job_file(out_dir, task_id)
     if os.path.isfile(p):
         try:
@@ -104,7 +105,7 @@ def clear_job(out_dir, task_id):
             pass
 
 
-def _count_frames(d):
+def _count_frames(d: str) -> int:
     try:
         with os.scandir(d) as it:
             return sum(1 for _ in it)
@@ -112,9 +113,9 @@ def _count_frames(d):
         return 0
 
 
-def find_interrupted_jobs(out_dir):
+def find_interrupted_jobs(out_dir: str) -> list:
     """扫描输出目录中可续跑的任务，返回 [(job文件名, 描述dict, 已完成帧数), ...]"""
-    jobs = []
+    jobs: list = []
     try:
         names = os.listdir(out_dir)
     except OSError:
@@ -137,15 +138,16 @@ def find_interrupted_jobs(out_dir):
     return jobs
 
 
-def run_realesrgan(task, inp, outp, model, m_scale, fmt="png",
-                   progress_cb=None):
+def run_realesrgan(task, inp: str, outp: str, model: str, m_scale: int,
+                   fmt: str = "png", progress_cb=None) -> int:
     """启动超分引擎；目录模式输出必须为 jpg。返回退出码。
     进程句柄挂到 task._proc 上（cancel 时由 BaseTask 统一杀死）。
-    注意：stdout/stderr 必须 DEVNULL——挂 PIPE 不读会塞满管道卡死进程。"""
+    stdout 保持 DEVNULL（realesrgan 的进度靠数输出文件），
+    stderr 落滚动日志文件，报障时无需复现。"""
     cmd = [realesrgan_exe(), "-i", inp, "-o", outp,
            "-n", model, "-s", str(m_scale), "-f", fmt]
     proc = subprocess.Popen(cmd, creationflags=CREATE_NO_WINDOW,
-                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                            stdout=subprocess.DEVNULL, stderr=stderr_target())
     task._proc = proc
     try:
         if progress_cb is None:
@@ -168,7 +170,7 @@ def run_realesrgan(task, inp, outp, model, m_scale, fmt="png",
     return rc
 
 
-def probe_fps(src):
+def probe_fps(src: str) -> float:
     try:
         r = subprocess.run(
             [ffprobe(), "-v", "error", "-select_streams", "v:0",
@@ -187,17 +189,18 @@ def probe_fps(src):
     return fps
 
 
-def extract_frames(src, frames_in, fps):
+def extract_frames(src: str, frames_in: str, fps: float) -> int:
     os.makedirs(frames_in, exist_ok=True)
     subprocess.run(
         [ffmpeg(), "-y", "-i", src, "-r", f"{fps:g}", "-qscale:v", "1",
          os.path.join(frames_in, "%06d.jpg")],
         creationflags=CREATE_NO_WINDOW, check=True,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        stdout=subprocess.DEVNULL, stderr=stderr_target())
     return _count_frames(frames_in)
 
 
-def assemble(frames_out, src, fps, m_scale, eff, out_path):
+def assemble(frames_out: str, src: str, fps: float, m_scale: int,
+             eff: float, out_path: str) -> str:
     """把超分后的帧序列与原视频的音频合成成品。音频编解码不兼容时自动转 AAC。"""
     base = [ffmpeg(), "-y", "-framerate", f"{fps:g}",
             "-i", os.path.join(frames_out, "%06d.jpg"), "-i", src,
@@ -208,14 +211,14 @@ def assemble(frames_out, src, fps, m_scale, eff, out_path):
             "-movflags", "+faststart", out_path]
     try:
         subprocess.run(base, creationflags=CREATE_NO_WINDOW, check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                       stdout=subprocess.DEVNULL, stderr=stderr_target())
     except subprocess.CalledProcessError:
         cmd = base[:]
         i = cmd.index("-c:a")
         cmd[i + 1] = "aac"
         cmd[i:i] = ["-b:a", "192k"]
         subprocess.run(cmd, creationflags=CREATE_NO_WINDOW, check=True,
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                       stdout=subprocess.DEVNULL, stderr=stderr_target())
     return out_path
 
 
@@ -273,7 +276,7 @@ class EnhanceTask(BaseTask):
                     [ffmpeg(), "-y", "-i", tmp, "-vf", even_vf(eff),
                      "-frames:v", "1", out],
                     creationflags=CREATE_NO_WINDOW, check=True,
-                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    stdout=subprocess.DEVNULL, stderr=stderr_target())
                 os.remove(tmp)
             else:
                 os.replace(tmp, out)
@@ -326,22 +329,39 @@ class EnhanceTask(BaseTask):
             shutil.rmtree(tmp_root, ignore_errors=True)
             clear_job(self.out_dir, self.task_id)
             return out
-        except (CancelledError, Exception):
+        except Exception:
             # 失败/取消：保留现场，标记可续跑
             mark_job(self.out_dir, self.task_id, "interrupted")
             raise
 
 
 class ResumeTask(BaseTask):
-    """从任务档案恢复被中断的视频增强任务。"""
+    """从任务档案恢复被中断的视频增强任务。
+
+    所有档案读写都落在读取的那份档案文件上：成功后删除它，
+    失败/取消时把最新进度写回它——不再产生第二份档案或残留垃圾。"""
 
     def __init__(self, task_id, out_dir, job_filename, parent=None):
         super().__init__(task_id, parent)
         self.out_dir = out_dir
         self.job_filename = job_filename
 
+    def _job_path(self):
+        return os.path.join(self.out_dir, self.job_filename)
+
+    def _save_job(self, d, status):
+        d["status"] = status
+        d["updated"] = time.time()
+        d["done"] = _count_frames(
+            os.path.join(self.out_dir, d.get("tmp", ""), "out"))
+        try:
+            with open(self._job_path(), "w", encoding="utf-8") as f:
+                json.dump(d, f, ensure_ascii=False, indent=1)
+        except OSError:
+            pass
+
     def run(self):
-        p = os.path.join(self.out_dir, self.job_filename)
+        p = self._job_path()
         try:
             with open(p, encoding="utf-8") as f:
                 d = json.load(f)
@@ -364,8 +384,7 @@ class ResumeTask(BaseTask):
         stem = os.path.splitext(name)[0]
         out = unique_path(os.path.join(self.out_dir, f"{stem}_高清{scale}x.mp4"))
         try:
-            write_job(self.out_dir, self.task_id, src, mode, scale,
-                      d.get("tmp"), fps, total_expected, status="running")
+            self._save_job(d, "running")
             # 1) 抽帧未完成则重抽
             have_in = _count_frames(frames_in)
             if total_expected and have_in < total_expected:
@@ -412,12 +431,15 @@ class ResumeTask(BaseTask):
             self.progress(None, name=name, stage="合成视频")
             assemble(frames_out, src, fps, m_scale, eff, out)
             shutil.rmtree(tmp_root, ignore_errors=True)
-            clear_job(self.out_dir, self.task_id)
+            try:
+                os.remove(p)
+            except OSError:
+                pass
             self.progress(100, name=name)
             self.done(path=out)
         except CancelledError:
-            mark_job(self.out_dir, self.task_id, "interrupted")
+            self._save_job(d, "interrupted")
             self.error("已取消（进度已保留，可稍后恢复）", cancelled=True)
         except Exception as e:
-            mark_job(self.out_dir, self.task_id, "interrupted")
+            self._save_job(d, "interrupted")
             self.error(str(e) or e.__class__.__name__)

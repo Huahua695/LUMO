@@ -91,8 +91,8 @@ venv/Scripts/python -m pip install -r requirements.txt -r requirements-dev.txt -
 # 3) 生成真人·通用模式模型（需要 torch，只在转换时使用）
 venv/Scripts/python model_conv/convert.py
 
-# 4) 运行
-venv/Scripts/python app/main.py
+# 4) 运行（app 已是包，等价：python -m app.main）
+venv/Scripts/python run.py
 
 # 5) 打包（自动拷贝 tools 并创建桌面快捷方式）
 venv/Scripts/python scripts/build_app.py
@@ -133,8 +133,12 @@ QT_QPA_PLATFORM=offscreen venv/Scripts/python tests/test_suite.py
 
 ```
 newvideo/
+├── run.py              开发/打包入口（python -m app.main 等价）
 ├── app/                主程序源码（PySide6，四页：下载/增强/剪切/设置）
-│   ├── main.py             入口（--selftest 自检模式）
+│   ├── main.py             包内入口（--selftest 自检模式）
+│   ├── widgets.py          共用组件（卡片/目录行/空态/任务行）
+│   ├── range_slider.py     剪切页双柄选区条
+│   ├── proc.py             子进程常量 + stderr 滚动日志
 │   ├── main_window.py      主窗口（侧边栏导航）
 │   ├── download_tab.py / enhance_tab.py / cut_tab.py / settings_tab.py
 │   ├── direct_dl.py        直链下载（Range 断点续传）

@@ -51,7 +51,7 @@ def realesrgan_model(name: str) -> str:
     return os.path.join(tools_dir(), "realesrgan", "models", name + ".param")
 
 
-def tools_ready() -> list:
+def tools_ready() -> list[str]:
     """返回缺失的外部工具列表（空列表 = 全部就绪）。"""
     missing = []
     for p in (ffmpeg(), ffprobe(), m3u8dl_exe(), realesrgan_exe()):

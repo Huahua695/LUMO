@@ -1,6 +1,7 @@
 """通用小工具。"""
 import os
 import re
+import subprocess
 import time
 from urllib.parse import unquote, urlparse
 
@@ -77,3 +78,12 @@ def open_in_explorer(path: str):
         os.startfile(path)
     elif os.path.isfile(path):
         os.startfile(os.path.dirname(path))
+
+
+def reveal_in_explorer(path: str):
+    """在资源管理器中定位文件；路径无效时回退到打开所在文件夹。"""
+    if os.path.isfile(path):
+        subprocess.Popen(["explorer", "/select,", os.path.normpath(path)])
+    else:
+        open_in_explorer(path if os.path.isdir(path)
+                         else os.path.dirname(path) or ".")
