@@ -119,8 +119,12 @@ def _notify_listeners():
         alive.append(ref)
         try:
             cb()
-        except Exception:
-            pass
+        except Exception as e:
+            # 单个回调失败不能中断其余刷新，但要留痕排查
+            from .proc import append_log
+            import traceback
+            append_log(f"[theme] 回调 {getattr(cb, '__qualname__', cb)} 失败: {e}\n"
+                       + traceback.format_exc())
     _listeners[:] = alive
 
 

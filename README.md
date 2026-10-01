@@ -138,6 +138,8 @@ newvideo/
 │   ├── main.py             包内入口（--selftest 自检模式）
 │   ├── widgets.py          共用组件（卡片/目录行/空态/任务行）
 │   ├── range_slider.py     剪切页双柄选区条
+│   ├── douyin.py           抖音解析（短链展开/ttwid/分享页/无水印直链）
+│   ├── errors.py           全界面中文报错翻译层
 │   ├── proc.py             子进程常量 + stderr 滚动日志
 │   ├── main_window.py      主窗口（侧边栏导航）
 │   ├── download_tab.py / enhance_tab.py / cut_tab.py / settings_tab.py
