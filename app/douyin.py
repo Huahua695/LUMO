@@ -23,6 +23,8 @@ MOBILE_UA = (
 
 SHORT_RE = re.compile(r"https?://v\.douyin\.com/[\w-]+/?", re.IGNORECASE)
 ID_RE = re.compile(r"(?:video|note)/(\d+)")
+# 精选/发现/主页弹窗等形式：ID 在查询参数里（www.douyin.com/jingxuan?modal_id=xxx）
+MODAL_RE = re.compile(r"[?&]modal_id=(\d+)")
 ROUTER_RE = re.compile(r"window\._ROUTER_DATA\s*=\s*(\{.*?\})[\s;]*</script>", re.S)
 TTWID_URL = "https://ttwid.bytedance.com/ttwid/union/register/"
 
@@ -36,6 +38,15 @@ class DouyinError(Exception):
 def is_douyin(url: str) -> bool:
     u = (url or "").lower()
     return "douyin.com" in u or "iesdouyin.com" in u
+
+
+def extract_aweme_id(url: str) -> str:
+    """从各种抖音链接形态里取视频 ID；取不到返回空串。
+
+    覆盖：/video/{id}、/note/{id}、?modal_id={id}（精选/发现/主页弹窗）。
+    """
+    m = ID_RE.search(url or "") or MODAL_RE.search(url or "")
+    return m.group(1) if m else ""
 
 
 def build_play_url(raw: str) -> str:
@@ -134,10 +145,10 @@ def resolve(url: str) -> dict:
     if not is_douyin(u):
         raise DouyinError("不是抖音链接")
     final = expand_short(u) if SHORT_RE.match(u) else u
-    m = ID_RE.search(final)
-    if not m:
+    # 短链展开后的地址与原始地址（含 modal_id 等参数）都试一遍
+    aweme_id = extract_aweme_id(final) or extract_aweme_id(u)
+    if not aweme_id:
         raise DouyinError("无法从链接中识别视频 ID（直播/商品等链接不支持）")
-    aweme_id = m.group(1)
 
     headers = {"User-Agent": MOBILE_UA}
     ttwid = _get_ttwid()

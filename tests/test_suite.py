@@ -534,10 +534,23 @@ _DY_SAMPLE_HTML = ("<html><script>window._ROUTER_DATA = "
 
 def t_douyin_parse():
     from app.douyin import (parse_share_html, build_play_url, is_douyin,
-                            DouyinError)
+                            extract_aweme_id, DouyinError)
     assert is_douyin("https://v.douyin.com/abc123/")
     assert is_douyin("https://www.iesdouyin.com/share/video/123/")
     assert not is_douyin("https://www.bilibili.com/video/BV1x")
+
+    # 视频链接的各形态 ID 提取（含精选页 modal_id 形式）
+    assert extract_aweme_id("https://www.douyin.com/video/7609259711708378534") \
+        == "7609259711708378534"
+    assert extract_aweme_id("https://www.douyin.com/note/7609259711708378534") \
+        == "7609259711708378534"
+    assert (extract_aweme_id(
+        "https://www.douyin.com/jingxuan?modal_id=7690158493193588010")
+        == "7690158493193588010")
+    assert (extract_aweme_id(
+        "https://www.douyin.com/discover?modal_id=7609259711708378534&foo=1")
+        == "7609259711708378534")
+    assert extract_aweme_id("https://live.douyin.com/123abc") == ""
 
     info = parse_share_html(_DY_SAMPLE_HTML)
     assert info["title"] == "恭喜发财 #测试", info["title"]
