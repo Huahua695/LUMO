@@ -69,10 +69,10 @@ def friendly_error(e: BaseException, fallback: str = "操作失败") -> str:
         reason = _HTTP_CODE_MAP.get(e.code, f"服务器返回错误 {e.code}")
         return f"{reason}，请稍后重试"
     if isinstance(e, urllib.error.URLError):
-        reason = getattr(e, "reason", None)
-        if isinstance(reason, BaseException):
-            return f"无法连接：{friendly_error(reason, fallback)}"
-        return f"无法连接：{reason or '请检查网络'}"
+        inner_reason = getattr(e, "reason", None)
+        if isinstance(inner_reason, BaseException):
+            return f"无法连接：{friendly_error(inner_reason, fallback)}"
+        return f"无法连接：{inner_reason or '请检查网络'}"
     if isinstance(e, ConnectionError):
         return "网络连接失败，请检查网络后重试"
     if isinstance(e, TimeoutError):
