@@ -95,6 +95,25 @@ class ProbeTask(BaseTask):
         self.url = url.strip()
 
     def run(self):
+        # 抖音：yt-dlp 的 DouyinIE 需要 cookie（web API 有签名），无 cookie 必失败。
+        # 这里走移动端分享页解析（app/douyin.py），失败则回退 yt-dlp 兜底。
+        from .douyin import is_douyin, resolve
+        if is_douyin(self.url):
+            try:
+                info = resolve(self.url)
+            except Exception:
+                info = None
+            if info:
+                thumb = _download_thumbnail(info.get("cover") or "")
+                self.done(kind="video",
+                          title=info.get("title") or "",
+                          uploader=info.get("author") or "",
+                          duration=info.get("duration") or 0,
+                          thumbnail=thumb,
+                          formats=[],
+                          douyin_url=info.get("play_url"),
+                          douyin_title=info.get("title") or "")
+                return
         import yt_dlp
         opts: dict = {
             "quiet": True,

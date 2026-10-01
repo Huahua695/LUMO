@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
 
 from . import icons, theme
 from .theme import elide
+from .douyin import is_douyin
 from .url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
 from .paths import tools_ready
 from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow
@@ -133,6 +134,7 @@ class DownloadTab(QWidget):
         self._probe_url = ""
         self._probe_format_id = None
         self._probe_entries = None
+        self._douyin_cache = {}  # 抖音短链 -> (play_url, title)，probe 时解析一次
         self._probe_timer = QTimer(self)
         self._probe_timer.setSingleShot(True)
         self._probe_timer.setInterval(900)
@@ -245,6 +247,9 @@ class DownloadTab(QWidget):
         from PySide6.QtWidgets import QApplication
         cb = QApplication.clipboard()
         if not cb.text():
+            # 空剪贴板给个反馈，避免按钮「点了没反应」
+            self.detect_label.setText("剪贴板是空的，先去复制一个链接")
+            QTimer.singleShot(2500, self._restore_detect_hint)
             return
         cur = self.url_edit.toPlainText()
         if cur.strip():
@@ -253,6 +258,10 @@ class DownloadTab(QWidget):
             self.url_edit.setPlainText(cb.text().strip())
         self.url_edit.verticalScrollBar().setValue(
             self.url_edit.verticalScrollBar().maximum())
+
+    def _restore_detect_hint(self):
+        if not self._urls():
+            self.detect_label.setText("自动识别：等待输入…")
 
     def _fill_sample(self):
         self.url_edit.setPlainText(SAMPLE_URL)
@@ -277,7 +286,11 @@ class DownloadTab(QWidget):
             self._current_engine = detect_engine(urls[0])
             self._current_kind = (url_media_kind(urls[0])
                                   if self._current_engine == "direct" else None)
-            self.detect_label.setText(f"自动识别 → {ENGINE_LABEL[self._current_engine]}")
+            if self._current_engine == "site" and is_douyin(urls[0]):
+                self.detect_label.setText("自动识别 → 抖音视频（无水印）")
+            else:
+                self.detect_label.setText(
+                    f"自动识别 → {ENGINE_LABEL[self._current_engine]}")
         else:
             engines = {detect_engine(u) for u in urls}
             self._current_engine = engines.pop() if len(engines) == 1 else "mixed"
@@ -328,6 +341,10 @@ class DownloadTab(QWidget):
             return
         event = ev.get("event")
         if event == "done":
+            if ev.get("douyin_url"):
+                # 抖音：缓存无水印直链与标题，下载时不再二次解析
+                self._douyin_cache[self._probe_url] = (
+                    ev["douyin_url"], ev.get("douyin_title") or "")
             if ev.get("kind") == "playlist":
                 self._probe_entries = ev.get("entries") or []
                 self.probe_title.setText(elide(ev.get("title", "播放列表"), 52))
@@ -512,11 +529,15 @@ class DownloadTab(QWidget):
                 return
 
     def _clear_finished(self):
-        # 已结束（完成/失败/取消）的任务行
-        for tid in [tid for tid, t in self.threads.items() if t.isFinished()]:
+        # 已结束的任务：完成/取消/失败后线程已从 self.threads 移除，
+        # 因此「行不在 threads 里」即视为已结束（排队/运行中的线程还在，不会误清）
+        cleared = 0
+        for tid in [tid for tid in list(self.rows)
+                    if tid not in self.threads or self.threads[tid].isFinished()]:
             row = self.rows.pop(tid, None)
-            if row:
+            if row is not None:
                 self._take_row(row)
+                cleared += 1
             self.threads.pop(tid, None)
         # 丢弃 pending 里已无对应任务/已被取消的残留条目，避免槽位空出后隐形启动
         kept = []
@@ -532,7 +553,11 @@ class DownloadTab(QWidget):
                 self.threads.pop(entry[0], None)
         for entry in kept:
             self.pending.put(entry)
-        self._refresh_summary()
+        if cleared == 0:
+            self.summary.setText("没有可清除的记录")
+            QTimer.singleShot(2500, self._refresh_summary)
+        else:
+            self._refresh_summary()
 
     # ---------- 启动任务 ----------
     def _start(self):
@@ -553,7 +578,13 @@ class DownloadTab(QWidget):
     def _spawn(self, eng, url):
         tid = self.next_id
         self.next_id += 1
-        if eng == "direct":
+        if eng == "site" and is_douyin(url):
+            from .direct_dl import DouyinDownloadTask
+            play_url, title = self._douyin_cache.get(url, ("", ""))
+            th = DouyinDownloadTask(tid, url, self.settings.save_dir,
+                                    fmt=self.fmt.currentData(),
+                                    play_url=play_url, name=title)
+        elif eng == "direct":
             from .direct_dl import DirectDownloadTask
             th = DirectDownloadTask(tid, url, self.settings.save_dir,
                                     fmt=self.fmt.currentData())

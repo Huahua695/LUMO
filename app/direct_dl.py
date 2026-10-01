@@ -29,11 +29,13 @@ def _name_from_disposition(cd: str) -> str:
 
 
 class DirectDownloadTask(BaseTask):
-    def __init__(self, task_id, url, save_dir, fmt="auto", parent=None):
+    def __init__(self, task_id, url, save_dir, fmt="auto", name="",
+                 parent=None):
         super().__init__(task_id, parent)
         self.url = url.strip()
         self.save_dir = save_dir
         self.fmt = (fmt or "auto").lower()
+        self._name_hint = (name or "").strip()  # 调用方给定的文件名（如抖音标题）
 
     def _open(self, referer, range_start=None):
         h = {"User-Agent": DEFAULT_UA, "Referer": referer, "Accept": "*/*"}
@@ -51,7 +53,8 @@ class DirectDownloadTask(BaseTask):
             # 1) 探测：文件名与总大小
             with self._open(origin) as resp:
                 total = int(resp.headers.get("Content-Length") or 0)
-                name = (_name_from_disposition(resp.headers.get("Content-Disposition", ""))
+                name = (self._name_hint
+                        or _name_from_disposition(resp.headers.get("Content-Disposition", ""))
                         or filename_from_url(self.url)
                         or f"文件_{now_tag()}")
             final = unique_path(os.path.join(self.save_dir, name))
@@ -142,3 +145,29 @@ def _friendly(e: Exception) -> str:
     if isinstance(e, TimeoutError):
         return "连接超时，请检查网络后重试"
     return str(e) or e.__class__.__name__
+
+
+class DouyinDownloadTask(DirectDownloadTask):
+    """抖音分享链接 → 解析无水印直链 → 直链下载。
+
+    probe 已解析出 play_url 时直接下载；否则在线程内解析
+    （app/douyin.py，失败信息明确，不再回退 yt-dlp）。
+    """
+
+    def __init__(self, task_id, url, save_dir, fmt="auto",
+                 play_url="", name="", parent=None):
+        super().__init__(task_id, url, save_dir, fmt=fmt, name=name, parent=parent)
+        self._play_url = (play_url or "").strip()
+
+    def run(self):
+        if not self._play_url:
+            self._emit(event="started", name="抖音解析中…", resumed=False)
+            try:
+                from .douyin import resolve
+                info = resolve(self.url)
+            except Exception as e:
+                self.error(f"抖音解析失败：{e}")
+                return
+            self.url = info["play_url"]
+            self._name_hint = info["title"]
+        super().run()

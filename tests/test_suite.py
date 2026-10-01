@@ -501,6 +501,76 @@ def t_extract_urls():
     assert len([u for u in urls if "bilibili" in u.lower()]) == 1, "大小写去重失败"
     assert extract_urls("没有链接的一句话") == []
     assert extract_urls("") == []
+    # 抖音分享文本：emoji / 中文标点 / 短链
+    share = ("8.88 Kfx.zda 10/26 q@W.eu 复制打开抖音，看看【张三的作品】恭喜发财 "
+             "https://v.douyin.com/ybM4vQ3JbgA/ 复制此链接，打开抖音搜索，直接观看视频！")
+    durls = [u for u in extract_urls(share) if "v.douyin.com" in u]
+    assert len(durls) == 1, f"抖音短链提取失败: {durls}"
+
+
+_DY_SAMPLE_DATA = {
+    "loaderData": {
+        "video_layout": None,
+        "video_(id)/page": {
+            "itemId": "7609259711708378534",
+            "videoInfoRes": {"item_list": [{
+                "desc": "恭喜发财 #测试",
+                "author": {"nickname": "测试作者"},
+                "video": {
+                    "duration": 67221,
+                    "play_addr": {"url_list": [
+                        "https://aweme.snssdk.com/aweme/v1/playwm/"
+                        "?line=0&ratio=720p&video_id=v0300fg10000"]},
+                    "cover": {"url_list": ["https://p11-sign.douyinpic.com/cover.jpg"]},
+                },
+            }]},
+        },
+    }
+}
+_DY_SAMPLE_HTML = ("<html><script>window._ROUTER_DATA = "
+                   + json.dumps(_DY_SAMPLE_DATA, ensure_ascii=False)
+                   + ";</script></html>")
+
+
+def t_douyin_parse():
+    from app.douyin import (parse_share_html, build_play_url, is_douyin,
+                            DouyinError)
+    assert is_douyin("https://v.douyin.com/abc123/")
+    assert is_douyin("https://www.iesdouyin.com/share/video/123/")
+    assert not is_douyin("https://www.bilibili.com/video/BV1x")
+
+    info = parse_share_html(_DY_SAMPLE_HTML)
+    assert info["title"] == "恭喜发财 #测试", info["title"]
+    assert info["author"] == "测试作者"
+    assert abs(info["duration"] - 67.221) < 0.01, info["duration"]
+    assert info["cover"].startswith("https://p11-sign.douyinpic.com/")
+    play = info["play_url"]
+    assert "/play/" in play and "playwm" not in play, play
+    assert "ratio=1080p" in play, play
+
+    assert (build_play_url("https://aweme.snssdk.com/aweme/v1/playwm/?ratio=720p&x=1")
+            == "https://aweme.snssdk.com/aweme/v1/play/?ratio=1080p&x=1")
+
+    # 空壳 SSR（视频失效）应有明确错误
+    empty = "<script>window._ROUTER_DATA = " + json.dumps(
+        {"loaderData": {"video_(id)/page": {"itemId": "1"}}}) + ";</script>"
+    try:
+        parse_share_html(empty)
+        raise AssertionError("空壳应报错")
+    except DouyinError:
+        pass
+    # 图集（note）应有明确错误
+    gallery = ("<script>window._ROUTER_DATA = " + json.dumps(
+        {"loaderData": {"note_(id)/page": {"videoInfoRes": {"item_list": [{
+            "desc": "图集",
+            "images": [{"url_list": ["https://x/a.jpg"]}],
+            "video": {},
+        }]}}}}) + ";</script>")
+    try:
+        parse_share_html(gallery)
+        raise AssertionError("图集应报错")
+    except DouyinError as e:
+        assert "图集" in str(e)
 
 
 def t_download_tab_batch():
@@ -535,6 +605,11 @@ def t_download_tab_batch():
         assert len(files) == 5, f"完成 5 个任务, 实际 {len(files)}: {files}"
         for f in files:
             assert open(os.path.join(s.save_dir, f), "rb").read() == payload, f"{f} 内容不一致"
+        # 清除记录回归：任务结束后线程已移除，行必须仍可清除（曾经清不掉）
+        assert len(tab.rows) == 5, f"完成后应剩 5 行: {len(tab.rows)}"
+        tab._clear_finished()
+        assert tab.list.count() == 0 and not tab.rows, "清除记录后仍有残留行"
+        assert tab.empty_state.isVisibleTo(tab), "清除后应回到空状态"
         shutil.rmtree(s.save_dir)
     finally:
         srv.shutdown()
@@ -648,6 +723,7 @@ def main():
     check("解析画质列表去重", t_dedupe_formats)
     check("直链媒体类别识别", t_url_media_kind)
     check("多 URL 提取", t_extract_urls)
+    check("抖音解析（离线样本）", t_douyin_parse)
     print("== 下载引擎集成 ==")
     check("直链下载 Range 断点续传", t_direct_download_resume)
     check("直链下载全新下载", t_direct_download_fresh_and_cancel)
