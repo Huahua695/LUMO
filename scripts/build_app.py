@@ -24,6 +24,11 @@ def build_exe():
         "--collect-all", "yt_dlp",
         "--collect-all", "PySide6.QtMultimedia",
         "--collect-all", "PySide6.QtMultimediaWidgets",
+        # 纯 Widgets 应用：排除 QML/Quick/PDF 等用不到的 Python 模块
+        "--exclude-module", "PySide6.QtQuick",
+        "--exclude-module", "PySide6.QtQml",
+        "--exclude-module", "PySide6.QtPdf",
+        "--exclude-module", "setuptools",
         "--distpath", DIST,
         "--workpath", BUILD,
         "--specpath", ROOT,
@@ -31,6 +36,39 @@ def build_exe():
     ]
     print(">> PyInstaller ...")
     subprocess.run(cmd, check=True, cwd=ROOT)
+
+
+# 轻量化：纯 Widgets + Multimedia + Svg 应用用不到的 Qt 二进制。
+# 删除后必须跑 exe --selftest 和 scripts/screenshots.py 验证渲染；
+# 若个别机器窗口白屏（缺软件 OpenGL 回退），把 opengl32sw.dll 从清单移除。
+PRUNE_FILES = [
+    "opengl32sw.dll",
+    "Qt6Pdf.dll",
+    "Qt6VirtualKeyboard.dll",
+    "Qt6Quick.dll",
+    "Qt6Qml.dll",
+    "Qt6QmlMeta.dll",
+    "Qt6QmlModels.dll",
+    "Qt6QmlWorkerScript.dll",
+]
+PRUNE_DIRS = ["translations"]
+
+
+def prune_dist():
+    base = os.path.join(DIST, APP_NAME, "_internal", "PySide6")
+    removed = []
+    for rel in PRUNE_FILES:
+        p = os.path.join(base, rel.replace("/", os.sep))
+        if os.path.isfile(p):
+            os.remove(p)
+            removed.append(rel)
+    for rel in PRUNE_DIRS:
+        p = os.path.join(base, rel.replace("/", os.sep))
+        if os.path.isdir(p):
+            shutil.rmtree(p)
+            removed.append(rel + "/")
+    if removed:
+        print(f">> 裁剪无用 Qt 组件 {len(removed)} 项: {', '.join(removed)}")
 
 
 def copy_tools():
@@ -65,6 +103,7 @@ Write-Output ('快捷方式已创建: ' + (Join-Path $desktop '{APP_NAME}.lnk'))
 
 if __name__ == "__main__":
     build_exe()
+    prune_dist()
     copy_tools()
     make_shortcut()
     total = 0

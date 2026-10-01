@@ -347,7 +347,3 @@ def elide(s: str, n: int = 46) -> str:
     if len(s) <= n:
         return s
     return s[: n // 2 - 2] + "…" + s[-(n // 2 - 1):]
-
-
-# 兼容旧引用：全局 QSS 由 set_theme 应用到 QApplication，不要再 setStyleSheet(theme.QSS)
-QSS = ""
