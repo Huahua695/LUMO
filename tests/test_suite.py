@@ -716,6 +716,27 @@ def t_direct_guard():
         assert os.path.basename(done[0]["path"]) == "恶搞之家 #动画 #解说.mp4"
     finally:
         srv2.shutdown()
+    # 3) 403（如抖音 CDN 签名过期）：报错含 403 且不落盘
+    class H3(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(403)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def log_message(self, *a):
+            pass
+
+    srv3 = ThreadingHTTPServer(("127.0.0.1", 0), H3)
+    threading.Thread(target=srv3.serve_forever, daemon=True).start()
+    d3 = tempfile.mkdtemp()
+    try:
+        t = DirectDownloadTask(92, f"http://127.0.0.1:{srv3.server_address[1]}/v", d3)
+        events = run_task_until(t, 30)
+        errs = [e for e in events if e["event"] == "error"]
+        assert errs and "403" in errs[0]["error"], events[-1] if events else "无事件"
+        assert os.listdir(d3) == [], f"不应落盘: {os.listdir(d3)}"
+    finally:
+        srv3.shutdown()
         shutil.rmtree(d)
 
 

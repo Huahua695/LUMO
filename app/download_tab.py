@@ -135,7 +135,7 @@ class DownloadTab(QWidget):
         self._probe_url = ""
         self._probe_format_id = None
         self._probe_entries = None
-        self._douyin_cache = {}  # 抖音短链 -> (play_url, title)，probe 时解析一次
+        self._douyin_cache = {}  # 抖音短链 -> (play_url, title, ts)，probe 时解析一次
         self._probe_timer = QTimer(self)
         self._probe_timer.setSingleShot(True)
         self._probe_timer.setInterval(900)
@@ -344,9 +344,10 @@ class DownloadTab(QWidget):
         event = ev.get("event")
         if event == "done":
             if ev.get("douyin_url"):
-                # 抖音：缓存无水印直链与标题，下载时不再二次解析
+                # 抖音：缓存无水印直链与标题（带时效），下载时新鲜才复用
+                import time
                 self._douyin_cache[self._probe_url] = (
-                    ev["douyin_url"], ev.get("douyin_title") or "")
+                    ev["douyin_url"], ev.get("douyin_title") or "", time.time())
             if ev.get("kind") == "playlist":
                 self._probe_entries = ev.get("entries") or []
                 self.probe_title.setText(elide(ev.get("title", "播放列表"), 52))
@@ -588,7 +589,11 @@ class DownloadTab(QWidget):
         self.next_id += 1
         if eng == "site" and is_douyin(url):
             from .direct_dl import DouyinDownloadTask
-            play_url, title = self._douyin_cache.get(url, ("", ""))
+            import time
+            play_url, title, ts = self._douyin_cache.get(url, ("", "", 0.0))
+            if time.time() - ts > 300:
+                # 播放链接带时效签名，缓存超过 5 分钟不再复用，交给任务重新解析
+                play_url = ""
             th = DouyinDownloadTask(tid, url, self.settings.save_dir,
                                     fmt=self.fmt.currentData(),
                                     play_url=play_url, name=title)

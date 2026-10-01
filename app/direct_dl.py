@@ -179,12 +179,19 @@ class DouyinDownloadTask(DirectDownloadTask):
         self._play_url = (play_url or "").strip()
 
     def _play_looks_html(self) -> bool:
+        """预检播放链接：True = 已失效，需要重新解析拿新鲜签名链接。
+
+        失效的两种表现：返回 HTML 验证页；或直接 403/410（CDN 签名过期，
+        不返回页面直接拒绝）。403 是用户实际遇到的坑。
+        """
         try:
             req = urllib.request.Request(
                 self.url, headers={"User-Agent": "Mozilla/5.0", "Accept": "*/*"})
             with urllib.request.urlopen(req, timeout=20) as r:
                 ctype = (r.headers.get("Content-Type") or "").lower()
                 head = r.read(16)
+        except urllib.error.HTTPError as e:
+            return e.code in (403, 410)
         except Exception:
             return False  # 网络错误交给直链引擎去报
         return ("text/html" in ctype
@@ -207,7 +214,7 @@ class DouyinDownloadTask(DirectDownloadTask):
             # 链接失效/风控：丢弃当前链接，重新解析拿新鲜签名
             self._play_url = ""
         else:
-            self.error("抖音下载失败：播放链接已失效（两次解析均返回验证页），"
+            self.error("抖音下载失败：播放链接已失效（两次解析均失败），"
                        "请稍后重试")
             return
         super().run()
