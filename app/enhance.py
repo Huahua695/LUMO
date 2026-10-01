@@ -9,6 +9,7 @@ import subprocess
 import time
 
 from .base_task import BaseTask
+from .errors import friendly_error
 from .paths import ffmpeg, ffprobe, realesrgan_exe, realesrgan_model
 from .proc import CREATE_NO_WINDOW, stderr_target
 from .utils import IMAGE_EXTS, VIDEO_EXTS, unique_path
@@ -256,7 +257,7 @@ class EnhanceTask(BaseTask):
                 self.error("已取消（进度已保留，可稍后恢复）", cancelled=True)
                 return
             except Exception as e:
-                errors.append((name, str(e) or e.__class__.__name__))
+                errors.append((name, friendly_error(e, "处理失败")))
         self._emit(event="done", results=results, errors=errors,
                    out_dir=self.out_dir)
 
@@ -442,4 +443,4 @@ class ResumeTask(BaseTask):
             self.error("已取消（进度已保留，可稍后恢复）", cancelled=True)
         except Exception as e:
             self._save_job(d, "interrupted")
-            self.error(str(e) or e.__class__.__name__)
+            self.error(friendly_error(e, "恢复失败"))

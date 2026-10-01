@@ -6,6 +6,7 @@ import urllib.request
 import urllib.error
 
 from .base_task import BaseTask
+from .errors import friendly_error
 from .media_convert import convert_media
 from .utils import DEFAULT_UA, filename_from_url, unique_path, now_tag, sanitize_name
 
@@ -160,14 +161,7 @@ class DirectDownloadTask(BaseTask):
 
 
 def _friendly(e: Exception) -> str:
-    if isinstance(e, urllib.error.HTTPError):
-        return f"服务器返回错误 {e.code}（{e.reason}）"
-    if isinstance(e, urllib.error.URLError):
-        reason = getattr(e, "reason", e)
-        return f"无法连接：{reason}"
-    if isinstance(e, TimeoutError):
-        return "连接超时，请检查网络后重试"
-    return str(e) or e.__class__.__name__
+    return friendly_error(e, "下载失败")
 
 
 class DouyinDownloadTask(DirectDownloadTask):

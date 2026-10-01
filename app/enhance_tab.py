@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import icons, theme
+from .errors import friendly_error
 from .theme import elide
 from .utils import IMAGE_EXTS, VIDEO_EXTS
 from .app_settings import AppSettings
@@ -302,7 +303,12 @@ class EnhanceTab(QWidget):
             theme.retag(self.status, "err")
             self.status.setText("请先添加文件")
             return
-        os.makedirs(self.settings.enhance_dir, exist_ok=True)
+        try:
+            os.makedirs(self.settings.enhance_dir, exist_ok=True)
+        except Exception as e:
+            theme.retag(self.status, "err")
+            self.status.setText(friendly_error(e, "输出位置不可用"))
+            return
         from .enhance import EnhanceTask
         self.thread = EnhanceTask(uuid.uuid4().hex[:8], files,
                                   self.mode.currentData(),

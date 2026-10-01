@@ -586,6 +586,36 @@ def t_douyin_parse():
         assert "图集" in str(e)
 
 
+def t_friendly_errors():
+    """全界面中文报错：底层英文异常 → 中文；项目内中文消息透传"""
+    from app.errors import friendly_error
+    import urllib.error
+
+    # 项目内抛出的中文错误原样透传
+    assert friendly_error(Exception("抖音解析失败：测试")) == "抖音解析失败：测试"
+    # 文件系统类
+    assert friendly_error(FileNotFoundError(2, "No such file", "C:/x.mp4")) \
+        == "找不到文件：C:/x.mp4"
+    assert "没有权限" in friendly_error(PermissionError(13, "Permission denied"))
+    assert "磁盘空间不足" in friendly_error(OSError(28, "No space left on device"))
+    # 网络类
+    assert "404" in friendly_error(urllib.error.HTTPError(
+        "http://a", 404, "Not Found", {}, None))
+    assert "超时" in friendly_error(TimeoutError("timed out"))
+    assert "网络连接失败" in friendly_error(ConnectionResetError())
+    ue = urllib.error.URLError(ConnectionRefusedError(111))
+    assert "无法连接" in friendly_error(ue)
+    # 关键词映射（yt-dlp 英文消息）
+    assert friendly_error(Exception("ERROR: Unsupported URL: https://x")) \
+        == "不支持的网站链接"
+    assert "登录" in friendly_error(Exception("ERROR: Sign in to confirm you're not a bot"))
+    assert "429" in friendly_error(Exception("HTTP Error 429: Too Many Requests"))
+    # 兜底不暴露英文细节
+    out = friendly_error(RuntimeError("some weird english detail"), "下载失败")
+    assert "weird" not in out and "下载失败" in out, out
+    assert friendly_error(RuntimeError(""), "下载失败") == "下载失败"
+
+
 def t_download_tab_batch():
     """★ 下载页批量粘贴：6 个 URL（含 1 个重复）→ 去重 5 个 → 3 并发自动排队"""
     from app.download_tab import DownloadTab
@@ -798,6 +828,7 @@ def main():
     check("直链媒体类别识别", t_url_media_kind)
     check("多 URL 提取", t_extract_urls)
     check("抖音解析（离线样本）", t_douyin_parse)
+    check("中文报错翻译层", t_friendly_errors)
     print("== 下载引擎集成 ==")
     check("直链下载 Range 断点续传", t_direct_download_resume)
     check("直链下载全新下载", t_direct_download_fresh_and_cancel)

@@ -4,6 +4,7 @@
 PyInstaller 打包入口为根目录 run.py。
 """
 import sys
+import threading
 import traceback
 
 from PySide6.QtCore import Qt
@@ -11,14 +12,27 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 
 def _excepthook(t, v, tb):
+    # 全界面中文报错：概要给用户，英文堆栈进日志
+    from .errors import friendly_error
+    from .proc import append_log
+    append_log(f"[UI] {t.__name__}: {v}\n" + traceback.format_exc())
+    msg = friendly_error(v, "界面操作出错")
     try:
-        QMessageBox.critical(None, "哎呀，出了点问题",
-                             f"{t.__name__}: {v}\n\n{traceback.format_exc(limit=4)}")
+        from .proc import log_path
+        QMessageBox.critical(
+            None, "哎呀，出了点问题",
+            f"{msg}\n\n详细原因已记录到日志：\n{log_path()}")
     except Exception:
         pass
     sys.__stderr__ and sys.__stderr__.write(traceback.format_exc())
+
+
+def _thread_excepthook(args):
+    # worker 线程兜底：任务层应自行捕获，漏网的写日志不弹窗
     from .proc import append_log
-    append_log(traceback.format_exc())
+    append_log(f"[thread] {args.exc_type.__name__}: {args.exc_value}\n"
+               + "".join(traceback.format_exception(
+                   args.exc_type, args.exc_value, args.exc_traceback)))
 
 
 def main():
@@ -35,6 +49,7 @@ def main():
         from PySide6.QtGui import QIcon
         app.setWindowIcon(QIcon(icon))
     sys.excepthook = _excepthook
+    threading.excepthook = _thread_excepthook
     from .app_settings import AppSettings
     settings = AppSettings()
     from .main_window import MainWindow

@@ -7,6 +7,7 @@ import threading
 import time
 
 from .base_task import BaseTask
+from .errors import friendly_error
 from .paths import m3u8dl_exe
 from .proc import CREATE_NO_WINDOW, stderr_target
 from .utils import now_tag
@@ -87,7 +88,7 @@ class M3u8DownloadTask(BaseTask):
             self.progress(100, stage="完成")
             self.done(path=out)
         except Exception as e:
-            self.error(str(e) or e.__class__.__name__)
+            self.error(friendly_error(e, "m3u8 下载失败"))
 
 
 def _find_result(save_dir: str, save_name: str) -> str:

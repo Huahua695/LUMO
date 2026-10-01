@@ -6,6 +6,7 @@ import threading
 import time
 
 from .base_task import BaseTask
+from .errors import friendly_error
 from .paths import ffmpeg, ffprobe
 from .proc import CREATE_NO_WINDOW, stderr_target
 from .utils import unique_path, sanitize_name
@@ -179,4 +180,4 @@ class CutTask(BaseTask):
                           total=fmt_time(duration))
             self.done(path=out)
         except Exception as e:
-            self.error(str(e) or e.__class__.__name__)
+            self.error(friendly_error(e, "剪切失败"))

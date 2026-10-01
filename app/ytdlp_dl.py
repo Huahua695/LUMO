@@ -5,6 +5,7 @@ import tempfile
 import time
 
 from .base_task import BaseTask
+from .errors import friendly_error
 from .paths import tools_dir
 from .utils import DEFAULT_UA
 
@@ -126,12 +127,7 @@ class ProbeTask(BaseTask):
             with yt_dlp.YoutubeDL(opts) as ydl:
                 info = ydl.extract_info(self.url, download=False)
         except Exception as e:
-            msg = str(e)
-            if "Unsupported URL" in msg:
-                msg = "不支持的网站链接"
-            elif "Sign in" in msg or "login" in msg.lower() or "会员" in msg:
-                msg = "该内容需要登录/会员，只能按默认画质尝试下载"
-            self.error(msg)
+            self.error(friendly_error(e, "解析失败"))
             return
         if not info:
             self.error("未能解析出视频信息")
@@ -243,14 +239,9 @@ class YtdlpTask(BaseTask):
         except DownloadCancelled:
             self.error("已取消", cancelled=True)
         except DownloadError as e:
-            msg = str(e)
-            if "Unsupported URL" in msg:
-                msg = "不支持的网站链接，可尝试直接复制视频文件地址"
-            elif "Sign in" in msg or "login" in msg.lower():
-                msg = "该内容需要登录才能观看，暂不支持"
-            self.error(msg)
+            self.error(friendly_error(e, "下载失败"))
         except Exception as e:
-            self.error(str(e) or e.__class__.__name__)
+            self.error(friendly_error(e, "下载失败"))
 
 
 def _newest_file(folder: str, min_t: float) -> str:

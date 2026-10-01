@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from . import icons, theme
+from .errors import friendly_error
 from .theme import elide
 from .douyin import is_douyin
 from .url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
@@ -260,6 +261,7 @@ class DownloadTab(QWidget):
             self.url_edit.verticalScrollBar().maximum())
 
     def _restore_detect_hint(self):
+        theme.retag(self.detect_label, "accent")
         if not self._urls():
             self.detect_label.setText("自动识别：等待输入…")
 
@@ -567,7 +569,13 @@ class DownloadTab(QWidget):
         if not urls:
             self.url_edit.setFocus()
             return
-        os.makedirs(self.settings.save_dir, exist_ok=True)
+        try:
+            os.makedirs(self.settings.save_dir, exist_ok=True)
+        except Exception as e:
+            theme.retag(self.detect_label, "err")
+            self.detect_label.setText(friendly_error(e, "保存位置不可用"))
+            QTimer.singleShot(4000, self._restore_detect_hint)
+            return
         for u in urls:
             self._spawn(detect_engine(u), u)
         # 提交后清空输入，避免再次点击造成重复下载
