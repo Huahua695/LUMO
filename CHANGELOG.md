@@ -5,6 +5,12 @@
 
 ## [Unreleased] / 计划中 (v1.3)
 
+### 轻量化与工程
+- **打包体积 377MB → 336MB（-45MB，-12%）**：PyInstaller 排除 QtQuick/QtQml/QtPdf/
+  setuptools，打包后自动裁剪用不到的 Qt 二进制（软件 OpenGL 回退 opengl32sw.dll、
+  QML/Quick 全家、Qt6Pdf、虚拟键盘、Qt 翻译文件 8MB）；删除后经 exe selftest 与
+  8 张截图渲染验证，界面与视频预览不受影响
+
 ### 新增（界面现代化 P0，见 docs/改进文档.md）
 - **设计令牌与暗色模式**：`theme.py` 重构为「令牌 → 生成 QSS」，浅色 / 暗色两套配色
   （强调色 #3478F6 / #0A84FF，卡片圆角 12、控件圆角 8，四级字号 12/13/15/20）；
