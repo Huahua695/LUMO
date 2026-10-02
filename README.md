@@ -22,9 +22,20 @@ AI 超分辨率（图片/视频）和视频剪切整合进一个干净的界面�
 
 | 链接类型 | 例子 | 引擎 |
 |---|---|---|
-| 视频网站链接 | B站 / YouTube / 抖音 / X 等数千个站点 | 内置 [yt-dlp](https://github.com/yt-dlp/yt-dlp) |
+| 视频网站链接 | B站 / YouTube / X 等（yt-dlp 收录的站点） | 内置 [yt-dlp](https://github.com/yt-dlp/yt-dlp) |
+| 抖音（含分享口令短链） | `v.douyin.com/xxx`、`douyin.com/jingxuan?modal_id=…` | 自建解析：**无水印** 1080p，无需登录 |
 | m3u8 / HLS / MPD（含直播源） | `.../index.m3u8` | 内置 [N_m3u8DL-CLI](https://github.com/nilaoda/N_m3u8DL-CLI)（AES-128 自动解密、自动合并） |
 | 文件直链 | 以 `.mp4 .mp3 .jpg` 等结尾的网址 | 内置下载器：原始字节保存，**天然无损**，支持 HTTP Range **断点续传** |
+
+**站点兼容性（实测口径）**：
+
+| 站点 | 免配置 | 需要什么 |
+|------|--------|----------|
+| B站 | ✅ 可下 | 高清 / 大会员画质需 Cookie（设置 → Cookie） |
+| 抖音 | ✅ 无水印 | 私密 / 好友可见 / 审核中的作品不可下 |
+| YouTube / X | ❌ | 代理（设置 → 网络，支持跟随系统代理） |
+| 西瓜 / 小红书 | ❌ | Cookie |
+| 快手 / 好看视频 / 微博 | ❌ | yt-dlp 未收录或上游 bug，暂无解 |
 
 - **可选画质/分辨率**：最佳 / 1080p / 720p / 480p / 仅音频（网站视频）
 - **可选保存格式**：MP4 / MKV / MP3 / M4A / JPG / PNG——按链接类型动态给出；

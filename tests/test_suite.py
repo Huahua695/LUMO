@@ -506,6 +506,11 @@ def t_extract_urls():
              "https://v.douyin.com/ybM4vQ3JbgA/ 复制此链接，打开抖音搜索，直接观看视频！")
     durls = [u for u in extract_urls(share) if "v.douyin.com" in u]
     assert len(durls) == 1, f"抖音短链提取失败: {durls}"
+    # 无空格口令：链接后紧跟中文不得污染（此前会崩在 ascii 编码）
+    nospace = ("7.99复制打开抖音，看看【张三的作品】"
+               "https://v.douyin.com/iRNBho6u/复制此链接，打开Dou音搜索")
+    nurls = [u for u in extract_urls(nospace) if "v.douyin.com" in u]
+    assert nurls == ["https://v.douyin.com/iRNBho6u/"], nurls
 
 
 _DY_SAMPLE_DATA = {
@@ -584,6 +589,23 @@ def t_douyin_parse():
         raise AssertionError("图集应报错")
     except DouyinError as e:
         assert "图集" in str(e)
+    # 服务端 filter_list 的失败原因原样透传（仅自己可见等）
+    filtered = ("<script>window._ROUTER_DATA = " + json.dumps({
+        "loaderData": {"video_(id)/page": {"videoInfoRes": {
+            "item_list": [],
+            "filter_list": [{"filter_reason": "status_self_see",
+                             "notice": "抱歉，作品不见了",
+                             "detail_msg": "因作品权限或已被删除，无法观看"}]}}}})
+        + ";</script>")
+    try:
+        parse_share_html(filtered)
+        raise AssertionError("filtered 应报错")
+    except DouyinError as e:
+        assert "仅作者自己可见" in str(e) and "作品权限" in str(e), str(e)
+    # 口令无空格粘贴：SHORT_RE.group(0) 是不含中文的干净短链
+    from app.douyin import SHORT_RE
+    m = SHORT_RE.match("https://v.douyin.com/iRNBho6u/复制此链接，打开Dou音搜索")
+    assert m and m.group(0) == "https://v.douyin.com/iRNBho6u/", m and m.group(0)
 
 
 def t_friendly_errors():
@@ -606,10 +628,26 @@ def t_friendly_errors():
     ue = urllib.error.URLError(ConnectionRefusedError(111))
     assert "无法连接" in friendly_error(ue)
     # 关键词映射（yt-dlp 英文消息）
-    assert friendly_error(Exception("ERROR: Unsupported URL: https://x")) \
-        == "不支持的网站链接"
+    assert "暂不支持" in friendly_error(Exception("ERROR: Unsupported URL: https://x"))
     assert "登录" in friendly_error(Exception("ERROR: Sign in to confirm you're not a bot"))
     assert "429" in friendly_error(Exception("HTTP Error 429: Too Many Requests"))
+    # Cookie 三连：需要 cookie / cookie 文件坏 / 自动读取被禁
+    assert "Cookie" in friendly_error(
+        Exception("[Douyin] Fresh cookies (not necessarily logged in) are needed"))
+    assert "Cookie 文件格式不正确" in friendly_error(
+        Exception("Cookie file cookies.txt is not valid"))
+    assert "cookies.txt" in friendly_error(
+        Exception("Failed to decrypt with DPAPI"))
+    # 无 format / 上游 extractor 崩溃 / GitHub issue 链接截断
+    assert "视频流" in friendly_error(Exception("[XiaoHongShu] No video formats found!"))
+    assert "上游" in friendly_error(TypeError("'NoneType' object is not subscriptable"))
+    out2 = friendly_error(Exception(
+        "ERROR: something (see https://github.com/yt-dlp/yt-dlp/issues/12345)"))
+    assert "github.com" not in out2, out2
+    # netenv：代理决策
+    from app.netenv import effective_proxy
+    assert effective_proxy("off", "http://x:1") == ""
+    assert effective_proxy("manual", " http://127.0.0.1:7890 ") == "http://127.0.0.1:7890"
     # 兜底不暴露英文细节
     out = friendly_error(RuntimeError("some weird english detail"), "下载失败")
     assert "weird" not in out and "下载失败" in out, out
@@ -834,6 +872,32 @@ def t_extract_audio_m4a_range():
     shutil.rmtree(d)
 
 
+def t_all_pages_construct():
+    """★ 四页全部实例化（新增设置项后最容易漏 import/拼错控件名）"""
+    from app.main_window import MainWindow
+
+    class _S:
+        pass
+    s = _S()
+    s.save_dir = tempfile.mkdtemp()
+    s.enhance_dir = tempfile.mkdtemp()
+    s.dl_quality = "best"
+    s.dl_format = "auto"
+    s.theme = "light"
+    s.cookie_file = ""
+    s.proxy_mode = "off"
+    s.proxy_url = ""
+    w = MainWindow(s)
+    assert w.stack.count() == 4
+    st = w.page_set
+    assert st.theme_combo.count() == 3
+    assert st.proxy_mode.count() == 3
+    for attr in ("theme_combo", "proxy_mode", "proxy_edit"):
+        assert hasattr(st, attr), attr
+    shutil.rmtree(s.save_dir)
+    shutil.rmtree(s.enhance_dir)
+
+
 def main():
     make_app()
     print("== 单元测试 ==")
@@ -849,6 +913,7 @@ def main():
     check("直链媒体类别识别", t_url_media_kind)
     check("多 URL 提取", t_extract_urls)
     check("抖音解析（离线样本）", t_douyin_parse)
+    check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
     print("== 下载引擎集成 ==")
     check("直链下载 Range 断点续传", t_direct_download_resume)

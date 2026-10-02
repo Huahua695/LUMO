@@ -22,6 +22,9 @@ MOBILE_UA = (
 )
 
 SHORT_RE = re.compile(r"https?://v\.douyin\.com/[\w-]+/?", re.IGNORECASE)
+
+# 抖音是国内站点：所有请求强制直连，不被系统代理/TUN 带去绕远路
+DIRECT_OPENER = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 ID_RE = re.compile(r"(?:video|note)/(\d+)")
 # 精选/发现/主页弹窗等形式：ID 在查询参数里（www.douyin.com/jingxuan?modal_id=xxx）
 MODAL_RE = re.compile(r"[?&]modal_id=(\d+)")
@@ -70,7 +73,7 @@ def _get_ttwid(timeout: int = 15) -> str:
         req = urllib.request.Request(
             TTWID_URL, data=body,
             headers={"Content-Type": "application/json", "User-Agent": MOBILE_UA})
-        with urllib.request.urlopen(req, timeout=timeout) as r:
+        with DIRECT_OPENER.open(req, timeout=timeout) as r:
             for c in (r.headers.get_all("Set-Cookie") or []):
                 if c.startswith("ttwid="):
                     _ttwid = c.split(";")[0].split("=", 1)[1]
@@ -84,7 +87,7 @@ def expand_short(url: str, timeout: int = 15) -> str:
     """v.douyin.com 短链 → 跟随 302 后的最终地址（含视频 ID）。"""
     req = urllib.request.Request(url, headers={"User-Agent": MOBILE_UA})
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with DIRECT_OPENER.open(req, timeout=timeout) as resp:
             final = resp.geturl()
             resp.read(64)
     except Exception as e:
@@ -109,9 +112,21 @@ def parse_share_html(html: str) -> dict:
     loader = data.get("loaderData") or {}
     page = (loader.get("video_(id)/page")
             or loader.get("note_(id)/page") or {})
-    items = (page.get("videoInfoRes") or {}).get("item_list") or []
+    vir = page.get("videoInfoRes") or {}
+    items = vir.get("item_list") or []
     if not items:
-        raise DouyinError("分享页里没有找到视频条目（视频可能已删除）")
+        # 服务端明确给出的失败原因（仅自己可见/审核中/地区限制…）原样透传
+        fl = (vir.get("filter_list") or [{}])[0]
+        reason = {
+            "status_self_see": "该作品仅作者自己可见",
+            "status_friend_see": "该作品仅好友可见",
+            "status_under_review": "该作品正在审核中，暂不可下载",
+            "status_deleted": "该作品已被删除",
+        }.get(fl.get("filter_reason"), "")
+        detail = fl.get("detail_msg") or fl.get("notice") or ""
+        if reason or detail:
+            raise DouyinError("：".join(x for x in (reason, detail) if x))
+        raise DouyinError("分享页里没有找到视频条目（视频可能已删除或需要登录）")
     item = items[0]
     if item.get("images"):
         raise DouyinError("这是图集（图文）链接，暂只支持视频")
@@ -144,7 +159,9 @@ def resolve(url: str) -> dict:
     u = (url or "").strip()
     if not is_douyin(u):
         raise DouyinError("不是抖音链接")
-    final = expand_short(u) if SHORT_RE.match(u) else u
+    m = SHORT_RE.match(u)
+    # group(0) 是不含中文的干净短链：口令粘贴无空格时尾部会带中文
+    final = expand_short(m.group(0)) if m else u
     # 短链展开后的地址与原始地址（含 modal_id 等参数）都试一遍
     aweme_id = extract_aweme_id(final) or extract_aweme_id(u)
     if not aweme_id:
@@ -156,7 +173,7 @@ def resolve(url: str) -> dict:
         headers["Cookie"] = f"ttwid={ttwid}"
     share_url = f"https://www.iesdouyin.com/share/video/{aweme_id}/"
     try:
-        with urllib.request.urlopen(
+        with DIRECT_OPENER.open(
                 urllib.request.Request(share_url, headers=headers),
                 timeout=20) as resp:
             html = resp.read().decode("utf-8", errors="replace")

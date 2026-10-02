@@ -3,6 +3,7 @@
 开发运行：项目根目录 `python run.py`（或 `python -m app.main`）；
 PyInstaller 打包入口为根目录 run.py。
 """
+import os
 import sys
 import threading
 import traceback
@@ -12,11 +13,18 @@ from PySide6.QtWidgets import QApplication, QMessageBox
 
 
 def _excepthook(t, v, tb):
-    # 全界面中文报错：概要给用户，英文堆栈进日志
+    # 全界面中文报错：概要给用户，英文堆栈进日志。
+    # 无人值守场景（offscreen/selftest）不弹模态框——会永远等不到点击。
     from .errors import friendly_error
     from .proc import append_log
     append_log(f"[UI] {t.__name__}: {v}\n" + traceback.format_exc())
     msg = friendly_error(v, "界面操作出错")
+    headless = ("--selftest" in sys.argv
+                or os.environ.get("QT_QPA_PLATFORM") == "offscreen")
+    if headless:
+        sys.__stderr__ and sys.__stderr__.write(
+            f"[UI-ERROR] {msg}\n{traceback.format_exc()}")
+        return
     try:
         from .proc import log_path
         QMessageBox.critical(
@@ -63,6 +71,16 @@ def main():
             from . import icons
             pm = icons.pixmap("download", "#666666", 24, 1.0)
             ok = pm is not None and not pm.isNull()
+        # 轻量网络自检：只记日志不改退出码（离线打包机不该误红）
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                "https://www.bilibili.com", method="HEAD",
+                headers={"User-Agent": "Mozilla/5.0"})
+            urllib.request.urlopen(req, timeout=8)
+        except Exception as e:
+            from .proc import append_log
+            append_log(f"[selftest] 网络自检未通过（不影响打包有效性）: {e}")
         sys.exit(0 if ok else 1)
     w = MainWindow(settings)
     w.show()

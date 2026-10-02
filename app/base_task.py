@@ -14,6 +14,7 @@ class BaseTask(QThread):
         self.task_id = task_id
         self._cancelled = False
         self._proc: subprocess.Popen | None = None
+        self._terminal_emitted = False  # done/error/cancelled 只发一次
         # 线程结束时归还"阻止睡眠"名额
         self.finished.connect(self._release_sleep)
 
@@ -34,6 +35,11 @@ class BaseTask(QThread):
                 pass
 
     def _emit(self, **kw):
+        if kw.get("event") in ("done", "error", "cancelled"):
+            # 终态只发一次：防止看门狗超时与线程自身收尾事件双重上报
+            if self._terminal_emitted:
+                return
+            self._terminal_emitted = True
         kw["id"] = self.task_id
         self.sig.emit(kw)
 
@@ -46,5 +52,11 @@ class BaseTask(QThread):
         self._emit(event="done", path=path, **kw)
 
     def error(self, msg="", cancelled=False, **kw):
-        self._emit(event="error" if not cancelled else "cancelled",
-                   error=msg, **kw)
+        if not cancelled:
+            # 失败落日志：报障不再依赖复现（英文原文/堆栈由调用方另行记录）
+            try:
+                from .proc import append_log
+                append_log(f"[task:{type(self).__name__}] {msg}\n")
+            except Exception:
+                pass
+        self._emit(event="error" if not cancelled else "cancelled", error=msg, **kw)

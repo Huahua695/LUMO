@@ -2,6 +2,7 @@
 支持画质/分辨率选择、保存格式选择、链接解析预览（标题/封面/真实分辨率/播放列表）。"""
 import os
 import tempfile
+import threading
 import time
 
 from .base_task import BaseTask
@@ -12,6 +13,19 @@ from .utils import DEFAULT_UA
 QUALITY_HEIGHTS = {"1080p": 1080, "720p": 720, "480p": 480}
 AUDIO_FORMATS = ("mp3", "m4a")
 MAX_PLAYLIST = 100
+# 下载停滞判定：超过该秒数没有任何进度/后处理事件则报超时（大文件正常
+# 下载每 0.4s 就有一次 hook 回调，停滞只可能是网络断了或需要代理）
+DOWNLOAD_STALL = 90
+
+
+def _log_raw(task_name: str, e: BaseException):
+    """把翻译前的英文原文+堆栈写入日志（friendly_error 只给用户中文壳）。"""
+    try:
+        from .proc import append_log
+        import traceback
+        append_log(f"[{task_name}] raw={e!r}\n{traceback.format_exc()}")
+    except Exception:
+        pass
 
 
 def build_ytdlp_opts(quality: str, fmt: str, format_id=None) -> dict:
@@ -89,11 +103,20 @@ def _download_thumbnail(url: str) -> str:
 
 
 class ProbeTask(BaseTask):
-    """链接解析：单视频返回标题/封面/时长/真实分辨率；播放列表返回条目清单。"""
+    """链接解析：单视频返回标题/封面/时长/真实分辨率；播放列表返回条目清单。
 
-    def __init__(self, task_id, url, parent=None):
+    解析有 25 秒整体超时（yt-dlp 内部 retries 会把单次 socket 超时放大到
+    两分钟，光靠 socket_timeout 管不住总时长）：解析放到子线程 join，
+    超时即报错返回，残留线程随进程退出。
+    """
+
+    PROBE_TIMEOUT = 25  # 秒
+
+    def __init__(self, task_id, url, cookie_file="", proxy="", parent=None):
         super().__init__(task_id, parent)
         self.url = url.strip()
+        self.cookie_file = cookie_file or ""
+        self.proxy = proxy or ""
 
     def run(self):
         # 抖音：yt-dlp 的 DouyinIE 需要 cookie（web API 有签名），无 cookie 必失败。
@@ -102,7 +125,8 @@ class ProbeTask(BaseTask):
         if is_douyin(self.url):
             try:
                 info = resolve(self.url)
-            except Exception:
+            except Exception as e:
+                _log_raw("ProbeTask", e)
                 info = None
             if info:
                 thumb = _download_thumbnail(info.get("cover") or "")
@@ -122,13 +146,34 @@ class ProbeTask(BaseTask):
             "noplaylist": False,
             "extract_flat": "in_playlist",  # 播放列表只取条目清单，不逐个解析
             "socket_timeout": 15,
+            "retries": 2,  # 探测别重试太狠，配合整体超时
         }
-        try:
-            with yt_dlp.YoutubeDL(opts) as ydl:
-                info = ydl.extract_info(self.url, download=False)
-        except Exception as e:
-            self.error(friendly_error(e, "解析失败"))
+        if self.cookie_file and os.path.isfile(self.cookie_file):
+            opts["cookiefile"] = self.cookie_file
+        if self.proxy:
+            opts["proxy"] = self.proxy
+
+        result: dict = {}
+
+        def _extract():
+            try:
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    result["info"] = ydl.extract_info(self.url, download=False)
+            except Exception as e:  # noqa: BLE001 - 统一翻译
+                result["err"] = e
+
+        worker = threading.Thread(target=_extract, daemon=True)
+        worker.start()
+        worker.join(self.PROBE_TIMEOUT)
+        if worker.is_alive():
+            self.error(f"该站点 {self.PROBE_TIMEOUT} 秒内无响应，"
+                       "可能需要代理（设置 → 网络）或已失效")
             return
+        if "err" in result:
+            _log_raw("ProbeTask", result["err"])
+            self.error(friendly_error(result["err"], "解析失败"))
+            return
+        info = result.get("info")
         if not info:
             self.error("未能解析出视频信息")
             return
@@ -158,13 +203,15 @@ class ProbeTask(BaseTask):
 
 class YtdlpTask(BaseTask):
     def __init__(self, task_id, url, save_dir, quality="best", fmt="auto",
-                 format_id=None, parent=None):
+                 format_id=None, cookie_file="", proxy="", parent=None):
         super().__init__(task_id, parent)
         self.url = url.strip()
         self.save_dir = save_dir
         self.quality = quality or "best"
         self.fmt = (fmt or "auto").lower()
         self.format_id = format_id
+        self.cookie_file = cookie_file or ""
+        self.proxy = proxy or ""
 
     def run(self):
         import yt_dlp
@@ -172,6 +219,7 @@ class YtdlpTask(BaseTask):
 
         self._final = ""
         last = {"t": 0.0}
+        last_event = {"t": time.time()}  # 停滞看门狗用
 
         def throttle():
             now = time.time()
@@ -183,6 +231,7 @@ class YtdlpTask(BaseTask):
         def progress_hook(d):
             if self._cancelled:
                 raise DownloadCancelled()
+            last_event["t"] = time.time()
             st = d.get("status")
             if st == "downloading":
                 total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
@@ -197,12 +246,23 @@ class YtdlpTask(BaseTask):
         def pp_hook(d):
             if self._cancelled:
                 raise DownloadCancelled()
+            last_event["t"] = time.time()
             info = d.get("info_dict") or {}
             fp = info.get("filepath") or info.get("filename")
             if fp:
                 self._final = fp
             if throttle():
                 self.progress(None, stage=f"后处理：{d.get('postprocessor', '')}")
+
+        def stall_watchdog():
+            """下载停滞超时：socket 卡死时 hook 不会再被调用，只能从外部判。"""
+            while not self._terminal_emitted:
+                if time.time() - last_event["t"] > DOWNLOAD_STALL:
+                    self._cancelled = True  # hook 恢复时自行抛 DownloadCancelled
+                    self.error("下载停滞超过 90 秒（网络不稳定或需要代理），已停止。"
+                               "可在「设置 → 网络」配置代理后重试")
+                    return
+                time.sleep(2)
 
         opts: dict = {
             "format": "bv*+ba/b",
@@ -221,12 +281,18 @@ class YtdlpTask(BaseTask):
             "noprogress": True,
             "socket_timeout": 20,
         }
+        if self.cookie_file and os.path.isfile(self.cookie_file):
+            opts["cookiefile"] = self.cookie_file
+        if self.proxy:
+            opts["proxy"] = self.proxy
         opts.update(build_ytdlp_opts(self.quality, self.fmt, self.format_id))
         try:
             self._emit(event="started", name=self.url[:80])
+            watchdog = threading.Thread(target=stall_watchdog, daemon=True)
+            watchdog.start()
             with yt_dlp.YoutubeDL(opts) as ydl:
                 ydl.download([self.url])
-            if self._cancelled:
+            if self._cancelled and not self._terminal_emitted:
                 self.error("已取消", cancelled=True)
                 return
             final = self._final
@@ -239,8 +305,10 @@ class YtdlpTask(BaseTask):
         except DownloadCancelled:
             self.error("已取消", cancelled=True)
         except DownloadError as e:
+            _log_raw("YtdlpTask", e)
             self.error(friendly_error(e, "下载失败"))
         except Exception as e:
+            _log_raw("YtdlpTask", e)
             self.error(friendly_error(e, "下载失败"))
 
 

@@ -60,3 +60,28 @@ class AppSettings:
     @theme.setter
     def theme(self, v: str):
         self.q.setValue("appearance/theme", v)
+
+    @property
+    def cookie_file(self) -> str:
+        return str(self.q.value("download/cookie_file", "") or "")
+
+    @cookie_file.setter
+    def cookie_file(self, v: str):
+        self.q.setValue("download/cookie_file", v)
+
+    @property
+    def proxy_mode(self) -> str:
+        v = str(self.q.value("network/proxy_mode", "system") or "system")
+        return v if v in ("system", "manual", "off") else "system"
+
+    @proxy_mode.setter
+    def proxy_mode(self, v: str):
+        self.q.setValue("network/proxy_mode", v)
+
+    @property
+    def proxy_url(self) -> str:
+        return str(self.q.value("network/proxy_url", "") or "")
+
+    @proxy_url.setter
+    def proxy_url(self, v: str):
+        self.q.setValue("network/proxy_url", v)

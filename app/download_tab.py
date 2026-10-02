@@ -59,7 +59,8 @@ class DownloadTab(QWidget):
         # ---- 卡片1：链接与保存位置 ----
         c1 = SectionCard("下载资源", title_style="h1")
         v1 = c1.body
-        s = QLabel("支持网站链接（B站 / YouTube / 抖音等）、m3u8/HLS、文件直链，原始数据无损保存。")
+        s = QLabel("B 站 / 抖音（无水印）/ m3u8 / 文件直链开箱即用；"
+                   "YouTube 等境外站点需代理，部分站点需 Cookie（在「设置」里配置）。原始数据无损保存。")
         s.setObjectName("sub")
         s.setWordWrap(True)
         v1.addWidget(s)
@@ -324,7 +325,12 @@ class DownloadTab(QWidget):
         self._probe_format_id = None
         self._probe_entries = None
         from .ytdlp_dl import ProbeTask
-        self._probe_task = ProbeTask(self._probe_task_id, urls[0])
+        from .netenv import effective_proxy
+        self._probe_task = ProbeTask(
+            self._probe_task_id, urls[0],
+            cookie_file=self.settings.cookie_file,
+            proxy=effective_proxy(self.settings.proxy_mode,
+                                  self.settings.proxy_url))
         self._probe_task.sig.connect(self._on_probe_event)
         self.probe_title.setText("")
         self.probe_meta.setText("")
@@ -611,9 +617,13 @@ class DownloadTab(QWidget):
             if (eng == "site" and self._probe_url == url
                     and self.fmt.currentData() not in ("mp3", "m4a")):
                 format_id = self._probe_format_id
+            from .netenv import effective_proxy
             th = YtdlpTask(tid, url, self.settings.save_dir,
                            quality=self.quality.currentData(),
-                           fmt=self.fmt.currentData(), format_id=format_id)
+                           fmt=self.fmt.currentData(), format_id=format_id,
+                           cookie_file=self.settings.cookie_file,
+                           proxy=effective_proxy(self.settings.proxy_mode,
+                                                 self.settings.proxy_url))
 
         item = QListWidgetItem()
         row = TaskProgressRow(tid)

@@ -25,10 +25,11 @@ def build_exe():
         "--collect-all", "PySide6.QtMultimedia",
         "--collect-all", "PySide6.QtMultimediaWidgets",
         # 纯 Widgets 应用：排除 QML/Quick/PDF 等用不到的 Python 模块
+        # （注意：不要 exclude setuptools——与 PySide6/yt-dlp 的 hook 组合
+        # 会让 PyInstaller 分析阶段卡死数十分钟）
         "--exclude-module", "PySide6.QtQuick",
         "--exclude-module", "PySide6.QtQml",
         "--exclude-module", "PySide6.QtPdf",
-        "--exclude-module", "setuptools",
         "--distpath", DIST,
         "--workpath", BUILD,
         "--specpath", ROOT,

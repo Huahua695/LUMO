@@ -1,9 +1,21 @@
-"""设置页：默认目录汇总 + 外观主题 + 关于信息（含第三方组件许可）。"""
-from PySide6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
+"""设置页：默认目录汇总 + Cookie + 网络代理 + 外观主题 + 关于信息。"""
+from PySide6.QtWidgets import (
+    QComboBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton,
+    QVBoxLayout, QWidget,
+)
 
 from . import theme
 from .version import APP_VERSION
 from .widgets import PathRow, SectionCard
+
+
+_COOKIE_HELP = (
+    "怎么导出 Cookie？\n\n"
+    "1. 用浏览器扩展（如 Get cookies.txt LOCALLY）在已登录目标网站的"
+    "标签页里导出，格式选 Netscape；\n"
+    "2. 导出后建议关闭对应标签页（减少 Cookie 失效）；\n"
+    "3. Cookie 有效期通常几天到几周，失效后重新导出即可；\n\n"
+    "Cookie 只保存在本机、只用于下载，不会上传。")
 
 
 class SettingsTab(QWidget):
@@ -21,6 +33,56 @@ class SettingsTab(QWidget):
         dirs_card.addLayout(PathRow("增强输出到", lambda: settings.enhance_dir,
                                     lambda d: setattr(settings, "enhance_dir", d)))
         root.addWidget(dirs_card)
+
+        # ---- Cookie（站点登录态：解锁需登录的站点与高清画质） ----
+        cookie_card = SectionCard("Cookie", title_style="h2")
+        cookie_card.addLayout(PathRow(
+            "cookies.txt", lambda: settings.cookie_file,
+            lambda v: setattr(settings, "cookie_file", v),
+            pick_file=True,
+            file_filter="Cookies 文件 (cookies.txt *.txt);;所有文件 (*)"))
+        crow = QHBoxLayout()
+        chelp = QPushButton("怎么导出？")
+        chelp.setProperty("ghost", True)
+        chelp.clicked.connect(
+            lambda: QMessageBox.information(self, "导出 Cookie", _COOKIE_HELP))
+        cnote = QLabel("需要登录的站点（西瓜 / 小红书 / B站高清等）在此导入；"
+                       "只读本地文件，不上传")
+        cnote.setObjectName("sub")
+        crow.addWidget(chelp)
+        crow.addWidget(cnote, 1)
+        cookie_card.addLayout(crow)
+        root.addWidget(cookie_card)
+
+        # ---- 网络代理（境外站点需要；跟随系统 = 读 Windows 代理设置） ----
+        net_card = SectionCard("网络", title_style="h2")
+        nrow = QHBoxLayout()
+        nlbl = QLabel("代理")
+        nlbl.setFixedWidth(110)
+        self.proxy_mode = QComboBox()
+        for data, text in (("system", "跟随系统"), ("manual", "手动"),
+                           ("off", "关闭（直连）")):
+            self.proxy_mode.addItem(text, data)
+        idx = self.proxy_mode.findData(settings.proxy_mode)
+        self.proxy_mode.blockSignals(True)
+        self.proxy_mode.setCurrentIndex(idx if idx >= 0 else 0)
+        self.proxy_mode.blockSignals(False)
+        self.proxy_mode.currentIndexChanged.connect(self._on_proxy_mode)
+        self.proxy_edit = QLineEdit(settings.proxy_url)
+        self.proxy_edit.setPlaceholderText("http://127.0.0.1:7890 或 socks5://…")
+        self.proxy_edit.textChanged.connect(self._on_proxy_url)
+        nrow.addWidget(nlbl)
+        nrow.addWidget(self.proxy_mode)
+        nrow.addSpacing(6)
+        nrow.addWidget(self.proxy_edit, 1)
+        net_card.addLayout(nrow)
+        nnote = QLabel("YouTube / X 等境外站点需要代理；「跟随系统」自动读取 "
+                       "Windows 代理设置。抖音 / B 站始终直连，不受影响。")
+        nnote.setObjectName("sub")
+        nnote.setWordWrap(True)
+        net_card.addWidget(nnote)
+        root.addWidget(net_card)
+        self._sync_proxy_edit()
 
         # ---- 外观 ----
         appearance = SectionCard("外观", title_style="h2")
@@ -67,3 +129,14 @@ class SettingsTab(QWidget):
         v = self.theme_combo.currentData() or "system"
         self.settings.theme = v
         theme.set_theme(v)
+
+    def _on_proxy_mode(self):
+        self.settings.proxy_mode = self.proxy_mode.currentData() or "system"
+        self._sync_proxy_edit()
+
+    def _on_proxy_url(self, text: str):
+        self.settings.proxy_url = (text or "").strip()
+
+    def _sync_proxy_edit(self):
+        # 「手动」模式才需要填地址
+        self.proxy_edit.setEnabled(self.settings.proxy_mode == "manual")

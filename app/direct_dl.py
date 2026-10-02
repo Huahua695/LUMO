@@ -167,52 +167,56 @@ def _friendly(e: Exception) -> str:
 class DouyinDownloadTask(DirectDownloadTask):
     """抖音分享链接 → 解析无水印直链 → 直链下载。
 
-    probe 已解析出 play_url 时直接下载；否则在线程内解析
-    （app/douyin.py，失败信息明确，不再回退 yt-dlp）。
-    下载前预检 play_url：抖音播放链接带时效签名，过期或风控时
-    服务器返回 200 + HTML 验证页——此时重新解析一次再下（共两轮）。
+    probe 已解析出 play_url 时直接下载（缓存命中，不重复解析）；
+    否则在线程内解析（app/douyin.py，失败信息明确，不再回退 yt-dlp）。
+    下载前预检直链：抖音播放链接带时效签名，失效表现为 HTML 验证页
+    或 403/410——三态预检确认失效才重解析，网络不确定时放行交给
+    直链引擎报真实错误。
     """
 
     def __init__(self, task_id, url, save_dir, fmt="auto",
                  play_url="", name="", parent=None):
         super().__init__(task_id, url, save_dir, fmt=fmt, name=name, parent=parent)
+        self._origin_url = url.strip()  # 原始抖音链接，重解析时用
         self._play_url = (play_url or "").strip()
+        if self._play_url:
+            # 缓存命中：直接把下载地址指向直链（否则预检会去开分享页误判）
+            self.url = self._play_url
 
-    def _play_looks_html(self) -> bool:
-        """预检播放链接：True = 已失效，需要重新解析拿新鲜签名链接。
-
-        失效的两种表现：返回 HTML 验证页；或直接 403/410（CDN 签名过期，
-        不返回页面直接拒绝）。403 是用户实际遇到的坑。
-        """
+    def _play_is_stale(self):
+        """三态：True=确认失效需重解析，False=可用，None=网络不确定。"""
         try:
+            from .douyin import DIRECT_OPENER, MOBILE_UA
             req = urllib.request.Request(
-                self.url, headers={"User-Agent": "Mozilla/5.0", "Accept": "*/*"})
-            with urllib.request.urlopen(req, timeout=20) as r:
+                self.url, headers={"User-Agent": MOBILE_UA, "Accept": "*/*"})
+            with DIRECT_OPENER.open(req, timeout=20) as r:
                 ctype = (r.headers.get("Content-Type") or "").lower()
                 head = r.read(16)
         except urllib.error.HTTPError as e:
-            return e.code in (403, 410)
+            return e.code in (403, 410)  # CDN 签名过期的典型表现
         except Exception:
-            return False  # 网络错误交给直链引擎去报
-        return ("text/html" in ctype
-                or head.lstrip()[:1] == b"<")
+            return None  # 关键：不确定时不要当成"有效"
+        return "text/html" in ctype or head.lstrip()[:1] == b"<"
 
     def run(self):
-        for _attempt in range(2):
-            if not self._play_url:
+        resolved = bool(self._play_url)  # 缓存命中即视为已解析
+        for _ in range(2):
+            if not resolved:
                 self._emit(event="started", name="抖音解析中…", resumed=False)
                 try:
                     from .douyin import resolve
-                    info = resolve(self.url)
+                    info = resolve(self._origin_url)
                 except Exception as e:
                     self.error(f"抖音解析失败：{e}")
                     return
                 self.url = info["play_url"]
                 self._name_hint = info["title"]
-            if not self._play_looks_html():
+                resolved = True
+            if self._play_is_stale() is not True:
+                # False=可用、None=不确定：都放行，交给直链引擎报真实错误
                 break
-            # 链接失效/风控：丢弃当前链接，重新解析拿新鲜签名
-            self._play_url = ""
+            # 确认失效 → 还原原始链接，下一轮重新解析
+            self.url, resolved = self._origin_url, False
         else:
             self.error("抖音下载失败：播放链接已失效（两次解析均失败），"
                        "请稍后重试")

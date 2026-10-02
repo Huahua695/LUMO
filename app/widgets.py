@@ -40,16 +40,20 @@ class SectionCard(QFrame):
 
 
 class PathRow(QHBoxLayout):
-    """目录选择行：标签 + 省略路径 + [folder] [arrow-out] 两个图标按钮。
+    """目录/文件选择行：标签 + 省略路径 + [folder] [arrow-out] 两个图标按钮。
 
-    getter/setter 读写设置项；changed 在目录变化后回调（如刷新恢复横幅）。
+    getter/setter 读写设置项；changed 在变化后回调（如刷新恢复横幅）。
+    pick_file=True 时改为选择文件（如 cookies.txt），「打开」也变成定位文件。
     """
 
-    def __init__(self, label_text: str, getter, setter, changed=None, parent=None):
+    def __init__(self, label_text: str, getter, setter, changed=None,
+                 pick_file: bool = False, file_filter: str = "", parent=None):
         super().__init__()
         self._getter = getter
         self._setter = setter
         self._changed = changed
+        self._pick_file = pick_file
+        self._file_filter = file_filter or "所有文件 (*)"
         lbl = QLabel(label_text)
         self.val = QLabel(elide(getter(), 52))
         self.val.setObjectName("sub")
@@ -57,13 +61,14 @@ class PathRow(QHBoxLayout):
 
         self.b_change = QPushButton()
         self.b_open = QPushButton()
-        for b, tip in ((self.b_change, "更改…"), (self.b_open, "打开文件夹")):
+        open_tip = "定位文件" if pick_file else "打开文件夹"
+        for b, tip in ((self.b_change, "更改…"), (self.b_open, open_tip)):
             b.setObjectName("iconBtn")
             b.setFixedSize(QSize(30, 30))
             b.setIconSize(QSize(16, 16))
             b.setToolTip(tip)
         self.b_change.clicked.connect(self._pick)
-        self.b_open.clicked.connect(lambda: open_in_explorer(self._getter()))
+        self.b_open.clicked.connect(self._open)
 
         self.addWidget(lbl)
         self.addWidget(self.val, 1)
@@ -82,13 +87,26 @@ class PathRow(QHBoxLayout):
             self.b_open.setIcon(QIcon(pm2))
 
     def _pick(self) -> None:
-        d = QFileDialog.getExistingDirectory(None, "选择文件夹", self._getter())
+        if self._pick_file:
+            d, _ = QFileDialog.getOpenFileName(
+                None, "选择文件", self._getter(), self._file_filter)
+        else:
+            d = QFileDialog.getExistingDirectory(None, "选择文件夹", self._getter())
         if d:
-            self._setter(d)
-            self.val.setText(elide(d, 52))
-            self.val.setToolTip(d)
-            if self._changed:
-                self._changed()
+            self._apply(d)
+
+    def _open(self) -> None:
+        if self._pick_file:
+            reveal_in_explorer(self._getter())
+        else:
+            open_in_explorer(self._getter())
+
+    def _apply(self, d: str) -> None:
+        self._setter(d)
+        self.val.setText(elide(d, 52))
+        self.val.setToolTip(d)
+        if self._changed:
+            self._changed()
 
 
 class EmptyState(QWidget):
