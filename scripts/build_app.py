@@ -78,7 +78,8 @@ def copy_tools():
     print(">> 拷贝外部工具 ...")
     if os.path.isdir(dst):
         shutil.rmtree(dst)
-    shutil.copytree(src, dst)
+    # Logs/ 是开发机的 ffreport 调试日志，不该带给最终用户（审查 P3-18）
+    shutil.copytree(src, dst, ignore=shutil.ignore_patterns("Logs"))
 
 
 def make_shortcut():
