@@ -6,6 +6,12 @@
 ## [1.3.0] - 2026-10-03
 
 ### 修复（全量功能正确性审查，详见 docs/审查日志-2026-10-03.md）
+- **抖音下载 403（防盗链）**：CDN 会拒绝把播放链接自身的域名
+  （aweme.snssdk.com / douyinvod.com 等）当 Referer 的请求——此前 Referer
+  取自播放地址 origin，必被 403。DouyinDownloadTask._open 现固定站点页
+  Referer（https://www.douyin.com/），探测/续传/正式下载三个调用点一处覆盖；
+  预检的无 Referer 请求 CDN 放行、行为不变。实测 877s/74MB 视频完整可下，
+  新增离线回归测试模拟 CDN 防盗链行为
 - **断点续跑兑现「关机/断电/崩溃」承诺（P1）**：进程被直接杀死时档案来不及标记、
   永远停在 `running` 的问题——启动扫描现在把 `running` 档案也识别为可恢复；
   主窗口新增 closeEvent，有任务运行时确认退出，退出前主线程兜底把运行中

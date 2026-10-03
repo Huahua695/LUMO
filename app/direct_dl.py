@@ -183,6 +183,13 @@ class DouyinDownloadTask(DirectDownloadTask):
             # 缓存命中：直接把下载地址指向直链（否则预检会去开分享页误判）
             self.url = self._play_url
 
+    def _open(self, referer, range_start=None):
+        # 抖音 CDN 校验 Referer：拿播放链接自身的域名（aweme.snssdk.com /
+        # douyinvod.com 等）当 Referer 会被防盗链 403（实测 2026-10），
+        # 固定用站点页 Referer 实测 200；无 Referer 的请求 CDN 放行
+        # （_play_is_stale 预检靠它）。探测/续传/正式下载都走这里，一处覆盖
+        return super()._open("https://www.douyin.com/", range_start)
+
     def _play_is_stale(self):
         """三态：True=确认失效需重解析，False=可用，None=网络不确定。"""
         try:

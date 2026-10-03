@@ -891,6 +891,60 @@ def t_direct_guard():
         shutil.rmtree(d)
 
 
+def t_douyin_download_referer():
+    """★ 抖音 403 修复：CDN 把播放链接自身域名当 Referer 会判盗链 403
+    （实测 2026-10），DouyinDownloadTask 必须固定 Referer=https://www.douyin.com/"""
+    from app.direct_dl import DouyinDownloadTask
+    payload = bytes(range(256)) * 1024  # 256 KB
+    seen = {"referer": []}
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            ref = self.headers.get("Referer")
+            if ref is None:
+                # 预检（_play_is_stale）无 Referer：CDN 放行，返回媒体头
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Content-Length", "16")
+                self.end_headers()
+                self.wfile.write(b"\x00\x00\x00 ftypisom")
+                return
+            seen["referer"].append(ref)
+            if ref != "https://www.douyin.com/":
+                # 模拟 CDN 防盗链：Referer 不对直接 403
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        d = tempfile.mkdtemp()
+        t = DouyinDownloadTask(
+            93, "https://v.douyin.com/mocktest/", d,
+            play_url=f"http://127.0.0.1:{srv.server_address[1]}/play.mp4",
+            name="防盗链测试")
+        events = run_task_until(t, 60)
+        done = [e for e in events if e["event"] == "done"]
+        assert done, f"未完成: {events[-1] if events else '无事件'}"
+        assert seen["referer"], "下载请求未经过 Referer 校验点"
+        assert all(r == "https://www.douyin.com/" for r in seen["referer"]), \
+            f"Referer 未固定为站点页: {seen['referer']}"
+        assert open(done[0]["path"], "rb").read() == payload, "下载内容不一致"
+        shutil.rmtree(d)
+    finally:
+        srv.shutdown()
+
+
 def t_direct_convert_image():
     """直链 PNG 下载后转 JPG"""
     from app.direct_dl import DirectDownloadTask
@@ -1035,6 +1089,7 @@ def main():
     check("直链下载 Range 断点续传", t_direct_download_resume)
     check("直链下载全新下载", t_direct_download_fresh_and_cancel)
     check("直链防线（HTML 拒绝/扩展名补全）", t_direct_guard)
+    check("抖音下载 Referer 防盗链", t_douyin_download_referer)
     check("直链 PNG→JPG 转换", t_direct_convert_image)
     check("直链 MP4→MP3 提取", t_direct_convert_audio)
     check("下载页批量粘贴自动排队", t_download_tab_batch)
