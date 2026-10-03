@@ -1,5 +1,6 @@
 """m3u8/HLS 下载引擎：调用本地已编译好的 N_m3u8DL-CLI。
 支持仅音频下载（--enableAudioOnly）与 MP3/M4A 后转换。"""
+import hashlib
 import os
 import re
 import subprocess
@@ -18,6 +19,17 @@ PCT_RE = re.compile(r"(\d+(?:\.\d+)?)\s*%")
 RESULT_EXTS = (".mp4", ".mkv", ".ts", ".flv", ".m4a", ".aac")
 
 
+def default_save_name(url: str, audio_only: bool = False) -> str:
+    """无显式名字时的兜底名：时间戳 + URL 哈希。
+
+    哈希不能省：批量粘贴多个 m3u8 时任务毫秒级同秒启动，只靠秒级时间戳
+    会生成完全相同的 saveName，多个 N_m3u8DL-CLI 进程写进同一目录互相
+    覆盖分片，最终合并出损坏文件。"""
+    tag = hashlib.md5(url.encode("utf-8")).hexdigest()[:6]
+    return (f"音频_{now_tag()}_{tag}" if audio_only
+            else f"视频_{now_tag()}_{tag}")
+
+
 class M3u8DownloadTask(BaseTask):
     def __init__(self, task_id, url, save_dir, name="", fmt="auto", parent=None):
         super().__init__(task_id, parent)
@@ -28,9 +40,7 @@ class M3u8DownloadTask(BaseTask):
         self.audio_only = self.fmt in ("mp3", "m4a")
 
     def run(self):
-        save_name = self.name or f"视频_{now_tag()}"
-        if self.audio_only:
-            save_name = f"音频_{now_tag()}"
+        save_name = self.name or default_save_name(self.url, self.audio_only)
         cmd = [
             m3u8dl_exe(), self.url,
             "--workDir", self.save_dir,

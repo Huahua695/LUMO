@@ -14,7 +14,7 @@ from .theme import elide
 from .douyin import is_douyin
 from .url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
 from .paths import tools_ready
-from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow
+from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow, retire_thread
 
 MAX_CONCURRENT = 3
 MAX_BATCH = 50
@@ -504,7 +504,8 @@ class DownloadTab(QWidget):
         codec = f if f in ("mp3", "m4a") else "MP3"
         if eng == "site":
             if audio:
-                self.save_hint.setText(f"仅提取音轨并转码为 {codec.upper()}（最高音质）")
+                self.save_hint.setText(
+                    f"仅提取音轨并转码为 {codec.upper()}（最高音质，不保留原视频）")
             else:
                 tail = {"mp4": "，封装为 MP4（兼容性最好）",
                         "mkv": "，封装为 MKV",
@@ -516,7 +517,8 @@ class DownloadTab(QWidget):
                         f"下载不超过 {q} 的最佳画质视频（源没有该分辨率时自动选最接近的）" + tail)
         elif eng == "m3u8":
             if audio:
-                self.save_hint.setText(f"仅下载 m3u8 音轨并转为 {codec.upper()}")
+                self.save_hint.setText(
+                    f"下载完成后提取音频并转为 {codec.upper()}（原视频会被替换删除）")
             else:
                 self.save_hint.setText("m3u8 源自动选取最高画质，合并封装为 MP4")
         else:
@@ -525,10 +527,12 @@ class DownloadTab(QWidget):
             elif f in ("mp4", "mkv"):
                 self.save_hint.setText(f"下载原始文件并无损转封装为 {f.upper()}")
             elif f in ("mp3", "m4a"):
-                self.save_hint.setText(f"下载后提取音频并转为 {f.upper()}")
+                self.save_hint.setText(
+                    f"下载后提取音频并转为 {f.upper()}（原视频会被替换删除）")
             else:
                 tip = "（JPG 为有损压缩）" if f == "jpg" else "（PNG 无损）"
-                self.save_hint.setText(f"下载后转换为 {f.upper()} 图片{tip}")
+                self.save_hint.setText(
+                    f"下载后转换为 {f.upper()} 图片{tip}（原文件会被替换）")
 
     def _take_row(self, row):
         for i in range(self.list.count()):
@@ -704,9 +708,8 @@ class DownloadTab(QWidget):
     def _on_thread_end(self, tid):
         th = self.threads.get(tid)
         if th:
-            th.wait(2000)
-            th.deleteLater()
             self.threads.pop(tid, None)
+            retire_thread(self, th)
         self.active = max(0, self.active - 1)
         # 取一个排队任务
         while self.active < MAX_CONCURRENT:

@@ -1,8 +1,11 @@
 """主窗口：左侧导航 + 四个页面。"""
+import os
+import time
+
 from PySide6.QtCore import QSize, Qt
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QMainWindow,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QMessageBox, QStackedWidget, QVBoxLayout, QWidget,
 )
 
 from . import icons
@@ -125,3 +128,51 @@ class MainWindow(QMainWindow):
         # 跟随系统模式下，系统深浅切换时重新应用主题
         if theme.mode() == "system":
             theme.set_theme("system")
+
+    # ---------- 退出兜底 ----------
+    def _busy_tasks(self) -> list:
+        """正在运行的任务线程列表（增强/恢复/下载/剪切）。"""
+        tasks = [self.page_enh.thread, self.page_enh.resume_thread,
+                 self.page_cut.thread]
+        tasks += list(self.page_dl.threads.values())
+        return [t for t in tasks if t is not None and t.isRunning()]
+
+    def closeEvent(self, e):
+        tasks = self._busy_tasks()
+        if not tasks:
+            super().closeEvent(e)
+            return
+        kinds = []
+        if self.page_enh.thread in tasks or self.page_enh.resume_thread in tasks:
+            kinds.append("画质增强")
+        if any(t in tasks for t in self.page_dl.threads.values()):
+            kinds.append("下载")
+        if self.page_cut.thread in tasks:
+            kinds.append("视频剪切")
+        ret = QMessageBox.question(
+            self, "任务正在进行",
+            f"{'、'.join(kinds)}任务正在进行，退出会中断它们。\n"
+            "增强任务的进度会保留在磁盘上，下次打开点「恢复任务」可以继续。\n\n"
+            "确定要退出吗？",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No)
+        if ret != QMessageBox.StandardButton.Yes:
+            e.ignore()
+            return
+        # 关键兜底：进程退出后工作线程没有机会写档案，必须先在主线程把
+        # running 档案标记为 interrupted，否则关机/关窗口场景进度无法恢复
+        from .enhance import mark_running_jobs_interrupted
+        mark_running_jobs_interrupted(self.settings.enhance_dir)
+        for t in tasks:
+            t.cancel()
+        deadline = time.time() + 4
+        while time.time() < deadline and any(t.isRunning() for t in tasks):
+            for t in tasks:
+                if t.isRunning():
+                    t.wait(100)
+        if any(t.isRunning() for t in tasks):
+            # 个别线程卡在不可中断的等待上（如网络 read）：设置落盘后硬退出，
+            # 避免 Qt 销毁仍在运行的 QThread 时 qFatal 崩溃
+            self.settings.q.sync()
+            os._exit(0)
+        super().closeEvent(e)

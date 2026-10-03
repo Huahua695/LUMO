@@ -186,6 +186,68 @@ def t_job_descriptors():
     shutil.rmtree(d)
 
 
+def t_job_running_recoverable():
+    """★ P1-1：进程被杀时档案来不及标记、停在 running——扫描必须能发现，
+    退出兜底标记（等价 closeEvent 动作）后可正常恢复"""
+    from app.enhance import (write_job, find_interrupted_jobs,
+                             mark_running_jobs_interrupted)
+    d = tempfile.mkdtemp()
+    tmp = os.path.join(d, ".sgtmp_77_1")
+    os.makedirs(os.path.join(tmp, "out"))
+    for i in range(1, 6):
+        open(os.path.join(tmp, "out", f"{i:06d}.jpg"), "w").close()
+    # 模拟进程被杀：档案停留在 running（工作线程没机会执行 mark_job）
+    write_job(d, 77, "C:/v.mp4", "anime", 2, ".sgtmp_77_1", 30.0, 40,
+              status="running")
+    jobs = find_interrupted_jobs(d)
+    assert len(jobs) == 1 and jobs[0][2] == 5, f"running 档案应可发现: {jobs}"
+    # 主线程兜底标记 → 状态转 interrupted，仍可发现
+    mark_running_jobs_interrupted(d)
+    jobs = find_interrupted_jobs(d)
+    assert len(jobs) == 1 and jobs[0][1]["status"] == "interrupted", jobs
+    # 没有现场目录（成功清理与档案删除之间被杀）→ 不可恢复，不得出现
+    write_job(d, 78, "C:/v.mp4", "anime", 2, ".sgtmp_78_1", 30.0, 0,
+              status="running")
+    assert all(j[1].get("tmp") != ".sgtmp_78_1" for j in find_interrupted_jobs(d)), \
+        "无现场目录的档案不应进入恢复列表"
+    shutil.rmtree(d)
+
+
+def t_m3u8_save_names():
+    """★ P1-2：多个 m3u8 任务同秒启动，兜底名不得冲突（否则分片互相覆盖写坏文件）"""
+    import hashlib
+    from app.m3u8_dl import default_save_name
+    a = default_save_name("http://a.live/x/index.m3u8")
+    b = default_save_name("http://b.live/x/index.m3u8")
+    assert a != b, f"同秒兜底名冲突: {a} vs {b}"
+    # 同一链接的哈希后缀稳定（同名重复下载覆盖，不产生垃圾副本）；
+    # 只比后缀，避免两次调用恰好跨秒时时间戳变化造成偶发失败
+    ha = hashlib.md5(b"http://a.live/x/index.m3u8").hexdigest()[:6]
+    assert a.endswith("_" + ha), f"缺少 URL 哈希后缀: {a}"
+    assert default_save_name("http://a.live/x/index.m3u8", audio_only=True) \
+        .startswith("音频_"), "仅音频任务应以 音频_ 开头"
+
+
+def t_frame_integrity():
+    """P2-5：半写截断的 jpg 必须被判为损坏，按缺失帧重算"""
+    from app.enhance import _frame_ok
+    good = os.path.join(tempfile.mkdtemp(), "000001.jpg")
+    subprocess.run([FFMPEG, "-y", "-v", "error", "-f", "lavfi",
+                    "-i", "color=c=red:s=32x32", "-frames:v", "1", good],
+                   check=True)
+    assert _frame_ok(good), "完整 jpg 应通过校验"
+    trunc = good.replace("000001", "000002")
+    data = open(good, "rb").read()
+    with open(trunc, "wb") as f:
+        f.write(data[:len(data) // 2])
+    assert not _frame_ok(trunc), "截断 jpg 应判为损坏"
+    empty = good.replace("000001", "000003")
+    open(empty, "wb").close()
+    assert not _frame_ok(empty), "空文件应判为损坏"
+    assert not _frame_ok(good.replace("000001", "000004")), "不存在的文件应判为损坏"
+    shutil.rmtree(os.path.dirname(good))
+
+
 # ---------------- Range 续传集成测试 ----------------
 def t_direct_download_resume():
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
@@ -391,6 +453,57 @@ def t_video_enhance_resume():
     assert has_audio
     assert find_interrupted_jobs(d) == [], "恢复后任务档案未清理"
     assert not [x for x in os.listdir(d) if x.startswith(".sgtmp_")], "恢复后临时帧未清理"
+    shutil.rmtree(d)
+
+
+def t_video_enhance_resume_zero_total():
+    """★ P1-3：抽帧阶段被中断（档案 total=0）→ 恢复必须全量重抽，
+    不得把半截帧当全部合成出时长短一截的半成品"""
+    from app.enhance import write_job, ResumeTask, find_interrupted_jobs, \
+        mark_running_jobs_interrupted
+    d = tempfile.mkdtemp()
+    src = os.path.join(d, "v.mp4")
+    gen_test_video(src, seconds=2, size="320x240")  # 60 帧 @30fps
+    tmp_name = ".sgtmp_zt_1"
+    frames_in = os.path.join(d, tmp_name, "in")
+    os.makedirs(frames_in)
+    os.makedirs(os.path.join(d, tmp_name, "out"))
+    # 模拟抽帧中途被杀：现场只有前 10 帧输入帧，档案停在 running 且 total=0
+    subprocess.run([FFMPEG, "-y", "-v", "error", "-i", src, "-frames:v", "10",
+                    os.path.join(frames_in, "%06d.jpg")], check=True)
+    write_job(d, "zt1", src, "anime", 2, tmp_name, 30.0, 0, status="running")
+    mark_running_jobs_interrupted(d)  # 等价 closeEvent 退出兜底
+    jobs = find_interrupted_jobs(d)
+    assert len(jobs) == 1, f"应发现 1 个可恢复任务: {jobs}"
+    r = ResumeTask("ztr", d, jobs[0][0])
+    events = run_task_until(r, 300)
+    done = [e for e in events if e["event"] == "done"]
+    assert done, f"恢复失败: {events[-1] if events else '无事件'}"
+    dur, (w, h), has_audio = probe(done[0]["path"])
+    # 修复前：10 帧/30fps ≈ 0.33s 且音画不同步；修复后：全片 2s
+    assert abs(dur - 2.0) < 0.3, f"恢复出的视频时长 {dur:.2f}s，应为全片 2s"
+    assert (w, h) == (640, 480), f"输出 {w}x{h} != 640x480"
+    assert has_audio, "恢复输出丢失音频"
+    assert find_interrupted_jobs(d) == [], "恢复后任务档案未清理"
+    shutil.rmtree(d)
+
+
+def t_video_enhance_real_filename_scale():
+    """★ P2-4：真人视频固定输出 2 倍，文件名必须标实际倍数（不得虚标 3x/4x）"""
+    from app.enhance import EnhanceTask
+    d = tempfile.mkdtemp()
+    src = os.path.join(d, "clip.mp4")
+    gen_test_video(src, seconds=1, size="320x240")
+    t = EnhanceTask(9, [src], "real", 3, d)  # 用户选 3 倍，实际固定输出 2 倍
+    events = run_task_until(t, 300)
+    done = [e for e in events if e["event"] == "done"]
+    assert done and done[0].get("results"), f"失败: {events[-1] if events else '无事件'}"
+    out = done[0]["results"][0][1]
+    assert os.path.basename(out).endswith("_高清2x.mp4"), \
+        f"文件名应标实际 2 倍: {os.path.basename(out)}"
+    dur, (w, h), _ = probe(out)
+    assert (w, h) == (640, 480), f"输出 {w}x{h} != 640x480"
+    assert not [x for x in os.listdir(d) if x.startswith(".sgjob_")], "成功后档案未清理"
     shutil.rmtree(d)
 
 
@@ -907,6 +1020,9 @@ def main():
     check("尺寸取偶滤镜", t_even_vf)
     check("防睡眠引用计数", t_sleep_guard)
     check("任务档案读写/扫描", t_job_descriptors)
+    check("任务档案 running 可发现+退出兜底", t_job_running_recoverable)
+    check("m3u8 兜底名防同秒冲突", t_m3u8_save_names)
+    check("输出帧完整性校验", t_frame_integrity)
     check("时间解析", t_parse_time)
     check("yt-dlp 画质/格式参数", t_build_ytdlp_opts)
     check("解析画质列表去重", t_dedupe_formats)
@@ -933,6 +1049,8 @@ def main():
     check("图片增强·真人通用模式 2x", t_image_enhance_real_mode)
     check("视频增强·动漫 3x", t_video_enhance_anime_3x)
     check("视频增强·中断→恢复全流程", t_video_enhance_resume)
+    check("视频增强·抽帧中断恢复（total=0 全量重抽）", t_video_enhance_resume_zero_total)
+    check("视频增强·真人文件名标实际倍数", t_video_enhance_real_filename_scale)
 
     fails = [r for r in RESULTS if r[1] == "FAIL"]
     print()

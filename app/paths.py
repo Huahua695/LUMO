@@ -51,10 +51,27 @@ def realesrgan_model(name: str) -> str:
     return os.path.join(tools_dir(), "realesrgan", "models", name + ".param")
 
 
+# 增强功能会用到的全部模型权重：param(结构) 与 bin(权重) 必须成对存在。
+# 只查 .param 的话，缺 bin 时启动自检照样通过、跑到一半才失败
+ENHANCE_MODELS = (
+    "realesrgan-x4plus",
+    "realesrgan-x4plus-anime",
+    "realesr-general-x4v3",
+    "realesr-animevideov3-x2",
+    "realesr-animevideov3-x3",
+    "realesr-animevideov3-x4",
+)
+
+
 def tools_ready() -> list[str]:
     """返回缺失的外部工具列表（空列表 = 全部就绪）。"""
     missing = []
     for p in (ffmpeg(), ffprobe(), m3u8dl_exe(), realesrgan_exe()):
         if not os.path.isfile(p):
             missing.append(os.path.basename(p))
+    mdir = os.path.join(tools_dir(), "realesrgan", "models")
+    for m in ENHANCE_MODELS:
+        for ext in (".param", ".bin"):
+            if not os.path.isfile(os.path.join(mdir, m + ext)):
+                missing.append(m + ext)
     return missing

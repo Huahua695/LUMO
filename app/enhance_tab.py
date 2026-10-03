@@ -13,7 +13,7 @@ from .errors import friendly_error
 from .theme import elide
 from .utils import IMAGE_EXTS, VIDEO_EXTS
 from .app_settings import AppSettings
-from .widgets import PathRow, SectionCard
+from .widgets import PathRow, SectionCard, retire_thread
 
 FILTER = "媒体文件 (*" + " *".join(sorted(IMAGE_EXTS | VIDEO_EXTS)) + ")"
 
@@ -199,7 +199,9 @@ class EnhanceTab(QWidget):
         self.resume_more.clear()
         self.resume_more.blockSignals(False)
         self.resume_more.setVisible(False)
-        if not jobs or (self.thread and self.thread.isRunning()):
+        busy = ((self.thread and self.thread.isRunning())
+                or (self.resume_thread and self.resume_thread.isRunning()))
+        if not jobs or busy:
             self.resume_box.setVisible(False)
             return
         name, d, done = jobs[0]
@@ -231,7 +233,8 @@ class EnhanceTab(QWidget):
             self._resume(self._resume_jobs[0])
 
     def _resume(self, job):
-        if self.thread and self.thread.isRunning():
+        if ((self.thread and self.thread.isRunning())
+                or (self.resume_thread and self.resume_thread.isRunning())):
             return
         from .enhance import ResumeTask
         name, d, done = job
@@ -379,13 +382,9 @@ class EnhanceTab(QWidget):
             self._refresh_resume()
 
     def _finish_ui(self):
-        if self.thread:
-            self.thread.wait(3000)
-            self.thread.deleteLater()
-            self.thread = None
-        if self.resume_thread:
-            self.resume_thread.wait(3000)
-            self.resume_thread.deleteLater()
-            self.resume_thread = None
+        retire_thread(self, self.thread, 3000)
+        self.thread = None
+        retire_thread(self, self.resume_thread, 3000)
+        self.resume_thread = None
         self.btn_start.setEnabled(True)
         self.btn_cancel.setVisible(False)

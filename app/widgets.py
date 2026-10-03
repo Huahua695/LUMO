@@ -15,6 +15,24 @@ from .theme import elide
 from .utils import human_size, human_speed, open_in_explorer, reveal_in_explorer
 
 
+def retire_thread(widget, th, timeout_ms: int = 2000) -> None:
+    """任务线程收尾：wait 超时仍未退出的线程绝不能 deleteLater——
+    Qt 6 会 qFatal「QThread: Destroyed while thread is still running」整个
+    进程闪退。改为挂到 finished 信号延迟回收，并在 widget 上保留 Python
+    引用，防止包装器先于 C++ 对象被回收。"""
+    if th is None:
+        return
+    th.wait(timeout_ms)
+    if th.isRunning():
+        retired = getattr(widget, "_retired_threads", None)
+        if retired is None:
+            retired = widget._retired_threads = []
+        retired.append(th)
+        th.finished.connect(th.deleteLater)
+    else:
+        th.deleteLater()
+
+
 class SectionCard(QFrame):
     """白底圆角卡片：标题 + 内容。四个页面的统一容器。"""
 

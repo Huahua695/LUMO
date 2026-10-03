@@ -13,7 +13,7 @@ from .theme import elide
 from .utils import VIDEO_EXTS, open_in_explorer
 from .cut_engine import CutTask, probe_duration, parse_time, fmt_time
 from .range_slider import RangeSlider
-from .widgets import SectionCard
+from .widgets import SectionCard, retire_thread
 
 try:
     from PySide6.QtMultimedia import QMediaPlayer, QAudioOutput
@@ -349,9 +349,7 @@ class CutTab(QWidget):
             self._finish()
 
     def _finish(self):
-        if self.thread:
-            self.thread.wait(3000)
-            self.thread.deleteLater()
-            self.thread = None
+        retire_thread(self, self.thread, 3000)
+        self.thread = None
         self.btn_start.setEnabled(True)
         self.btn_cancel.setVisible(False)

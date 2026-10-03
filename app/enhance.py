@@ -131,12 +131,49 @@ def find_interrupted_jobs(out_dir: str) -> list:
         except (OSError, ValueError):
             continue
         tmp_root = os.path.join(out_dir, d.get("tmp", ""))
-        if d.get("status") != "interrupted" or not os.path.isdir(tmp_root):
+        # running 也要认：进程被直接杀死（关机/关窗口/断电）时工作线程
+        # 来不及执行 mark_job，档案会永远停在 running——这正是最需要续跑的场景
+        if (d.get("status") not in ("interrupted", "running")
+                or not os.path.isdir(tmp_root)):
             continue
         done = _count_frames(os.path.join(tmp_root, "out"))
         jobs.append((fn, d, done))
     jobs.sort(key=lambda x: -x[1].get("updated", 0))
     return jobs
+
+
+def mark_running_jobs_interrupted(out_dir: str) -> None:
+    """把输出目录里所有 running 状态的档案同步标记为 interrupted。
+
+    退出前的兜底（主窗口 closeEvent 调用）：进程直接退出时线程没有机会
+    写档案，不在主线程补这一刀，进度就永远无法被「恢复任务」发现。"""
+    try:
+        names = os.listdir(out_dir)
+    except OSError:
+        return
+    for fn in names:
+        if not (fn.startswith(JOB_PREFIX) and fn.endswith(".json")):
+            continue
+        try:
+            with open(os.path.join(out_dir, fn), encoding="utf-8") as f:
+                d = json.load(f)
+        except (OSError, ValueError):
+            continue
+        if d.get("status") == "running":
+            mark_job(out_dir, fn[len(JOB_PREFIX):-len(".json")], "interrupted")
+
+
+def _frame_ok(p: str) -> bool:
+    """输出帧完整性：非空且 JPEG 以 FFD9 结尾。
+    超分进程被杀的瞬间可能正写到某帧的一半，截断帧混进合成会花屏。"""
+    try:
+        if os.path.getsize(p) < 4:
+            return False
+        with open(p, "rb") as f:
+            f.seek(-2, os.SEEK_END)
+            return f.read(2) == b"\xff\xd9"
+    except OSError:
+        return False
 
 
 def run_realesrgan(task, inp: str, outp: str, model: str, m_scale: int,
@@ -294,23 +331,27 @@ class EnhanceTask(BaseTask):
         name = os.path.basename(src)
         model, m_scale, eff = plan_for(self.mode, self.scale, is_video=True)
         stem = os.path.splitext(name)[0]
-        out = unique_path(os.path.join(self.out_dir, f"{stem}_高清{self.scale}x.mp4"))
+        # 文件名用实际输出倍数：真人/照片视频走「4x 模型再缩回」固定输出 2 倍，
+        # 拿用户选的倍数命名会虚标（「高清4x.mp4」实际只有 2 倍）
+        real_scale = max(1, round(m_scale * eff))
+        out = unique_path(os.path.join(self.out_dir, f"{stem}_高清{real_scale}x.mp4"))
         fps = probe_fps(src)
 
         tmp_name = f".sgtmp_{self.task_id}_{idx}"
+        job_id = f"{self.task_id}_{idx}"  # 每个视频一份档案：批量中某个失败不被后续覆盖
         tmp_root = os.path.join(self.out_dir, tmp_name)
         frames_in = os.path.join(tmp_root, "in")
         frames_out = os.path.join(tmp_root, "out")
         os.makedirs(frames_in, exist_ok=True)
         os.makedirs(frames_out, exist_ok=True)
-        write_job(self.out_dir, self.task_id, src, self.mode, self.scale,
+        write_job(self.out_dir, job_id, src, self.mode, self.scale,
                   tmp_name, fps, 0, status="running")
         try:
             self._file_progress(name, idx, None, stage="抽取视频帧")
             total = extract_frames(src, frames_in, fps)
             if self._cancelled:
                 raise CancelledError()
-            write_job(self.out_dir, self.task_id, src, self.mode, self.scale,
+            write_job(self.out_dir, job_id, src, self.mode, self.scale,
                       tmp_name, fps, total, status="running")
 
             t0 = time.time()
@@ -328,11 +369,11 @@ class EnhanceTask(BaseTask):
             assemble(frames_out, src, fps, m_scale, eff, out)
             # 成功：清理现场
             shutil.rmtree(tmp_root, ignore_errors=True)
-            clear_job(self.out_dir, self.task_id)
+            clear_job(self.out_dir, job_id)
             return out
         except Exception:
             # 失败/取消：保留现场，标记可续跑
-            mark_job(self.out_dir, self.task_id, "interrupted")
+            mark_job(self.out_dir, job_id, "interrupted")
             raise
 
 
@@ -361,6 +402,25 @@ class ResumeTask(BaseTask):
         except OSError:
             pass
 
+    def _salvage_out_r(self, d):
+        """把本轮临时目录 out_r 里已算完的帧搬回 frames_out。
+        取消/失败时 out_r 会在下次恢复被整个删掉，不搬回 = 已算的帧全部重算。"""
+        tmp_root = os.path.join(self.out_dir, d.get("tmp", ""))
+        out_r = os.path.join(tmp_root, "out_r")
+        frames_out = os.path.join(tmp_root, "out")
+        try:
+            names = os.listdir(out_r)
+        except OSError:
+            return
+        if not names:
+            return
+        os.makedirs(frames_out, exist_ok=True)
+        for fn in names:
+            try:
+                shutil.move(os.path.join(out_r, fn), os.path.join(frames_out, fn))
+            except OSError:
+                pass
+
     def run(self):
         p = self._job_path()
         try:
@@ -375,6 +435,7 @@ class ResumeTask(BaseTask):
             return
         mode, scale = d.get("mode", "anime"), int(d.get("scale", 2))
         model, m_scale, eff = plan_for(mode, scale, is_video=True)
+        real_scale = max(1, round(m_scale * eff))  # 与 EnhanceTask 命名规则一致
         fps = float(d.get("fps", 25))
         total_expected = int(d.get("total", 0))
 
@@ -383,20 +444,22 @@ class ResumeTask(BaseTask):
         frames_out = os.path.join(tmp_root, "out")
         name = os.path.basename(src)
         stem = os.path.splitext(name)[0]
-        out = unique_path(os.path.join(self.out_dir, f"{stem}_高清{scale}x.mp4"))
+        out = unique_path(os.path.join(self.out_dir, f"{stem}_高清{real_scale}x.mp4"))
         try:
             self._save_job(d, "running")
-            # 1) 抽帧未完成则重抽
+            # 1) 抽帧未完成则重抽。total=0 说明中断发生在抽帧阶段（或抽帧前），
+            #    档案里没有可信的帧总数——必须全量重抽，否则会把半截帧当成
+            #    全部合成出「时长短一截、音画不同步」的半成品
             have_in = _count_frames(frames_in)
-            if total_expected and have_in < total_expected:
+            if not total_expected or have_in < total_expected:
                 self.progress(None, name=name, stage="补齐抽帧")
                 extract_frames(src, frames_in, fps)
             total = _count_frames(frames_in)
             if total == 0:
                 raise RuntimeError("没有可用的视频帧")
-            # 2) 计算缺失帧，硬链接到临时目录（已完成的帧不重算）
+            # 2) 计算缺失/损坏帧，硬链接到临时目录（已完成的帧不重算）
             missing = [fn for fn in os.listdir(frames_in)
-                       if not os.path.exists(os.path.join(frames_out, fn))]
+                       if not _frame_ok(os.path.join(frames_out, fn))]
             self.progress(0, name=name, done=total - len(missing), total=total,
                           stage="AI逐帧超分")
             if missing:
@@ -439,8 +502,10 @@ class ResumeTask(BaseTask):
             self.progress(100, name=name)
             self.done(path=out)
         except CancelledError:
+            self._salvage_out_r(d)
             self._save_job(d, "interrupted")
             self.error("已取消（进度已保留，可稍后恢复）", cancelled=True)
         except Exception as e:
+            self._salvage_out_r(d)
             self._save_job(d, "interrupted")
             self.error(friendly_error(e, "恢复失败"))

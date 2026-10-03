@@ -86,15 +86,34 @@ def dedupe_formats(raw_formats) -> list[dict]:
     return out
 
 
+THUMB_PREFIX = "sgthumb_"
+
+
+def _cleanup_old_thumbs() -> None:
+    """删除上次遗留的封面临时文件。已显示的封面像素在 QPixmap 内存里，
+    删文件不影响当前界面；不清理的话 %TEMP% 会随使用缓慢累积。"""
+    tmp = tempfile.gettempdir()
+    try:
+        for fn in os.listdir(tmp):
+            if fn.startswith(THUMB_PREFIX) and fn.endswith(".jpg"):
+                try:
+                    os.remove(os.path.join(tmp, fn))
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 def _download_thumbnail(url: str) -> str:
-    """下载封面到临时文件，失败返回 ''。"""
+    """下载封面到临时文件，失败返回 ''。写入前顺手清掉历史遗留。"""
     if not url:
         return ""
     try:
         import urllib.request
         req = urllib.request.Request(url, headers={"User-Agent": DEFAULT_UA})
         data = urllib.request.urlopen(req, timeout=15).read()
-        fd, path = tempfile.mkstemp(suffix=".jpg")
+        _cleanup_old_thumbs()
+        fd, path = tempfile.mkstemp(suffix=".jpg", prefix=THUMB_PREFIX)
         with os.fdopen(fd, "wb") as f:
             f.write(data)
         return path
