@@ -13,14 +13,46 @@ URL_RE = re.compile(
     r"(?:m3u8dl://|https?://)[^\s，。；、）】》」』\"“”‘’<>『「\u4e00-\u9fff]+",
     re.IGNORECASE)
 
+# 无协议头时也允许识别的主机白名单。只收录 README 兼容性表里的站点 +
+# 常见短链，不做成"任意裸域名都当链接"——否则普通英文句子里的
+# "example.com" 会被误抓。新增站点时同步更新 README 的兼容性表。
+BARE_HOSTS = (
+    "b23.tv", "bili2233.cn", "bilibili.com",
+    "douyin.com", "iesdouyin.com",
+    "weibo.com", "weibo.cn", "t.cn",
+    "xiaohongshu.com", "xhslink.com",
+    "kuaishou.com", "chenzhongtech.com",
+    "ixigua.com", "haokan.baidu.com",
+    "youtube.com", "youtu.be",
+    "x.com", "twitter.com", "t.co",
+)
+
+# 裸主机匹配：白名单主机（可带 www./m. 前缀）+ 后续非空白非标点串。
+# (?<![\w./-]) 负向断言必须有：避免匹配到已有协议头的 URL 尾部
+# （https://www.bilibili.com/... 里的 www.bilibili.com/... 片段）
+BARE_RE = re.compile(
+    r"(?<![\w./-])(?:www\.|m\.)?(?:"
+    + "|".join(re.escape(h) for h in BARE_HOSTS)
+    + r")/[^\s，。；、）】》」』\"“”‘’<>『「\u4e00-\u9fff]*",
+    re.IGNORECASE)
+
+# 纯 BV 号（B 站视频编号，BV + 10 位字母数字）
+BV_RE = re.compile(r"(?<![0-9A-Za-z])BV[0-9A-Za-z]{10}(?![0-9A-Za-z])")
+
 
 def extract_urls(text: str):
-    """从任意粘贴文本提取 URL 列表（保持顺序、自动去重、容忍中文标点）。"""
+    """从任意粘贴文本提取 URL 列表（保持顺序、自动去重、容忍中文标点）。
+
+    三趟：带协议头的 URL → 无协议头的白名单主机 → 纯 BV 号。
+    归一化后统一去重，因此 "BV1xx" 与含同一 BV 号的完整链接不会重复。
+    """
+    text = text or ""
     urls, seen = [], set()
-    for m in URL_RE.findall(text or ""):
-        u = m.rstrip(".,;:!?)'\"，。；：！？）】》”’")
+
+    def add(raw: str):
+        u = raw.rstrip(".,;:!?)'\"，。；：！？）】》”’")
         if len(u) <= len("http://a.bb"):
-            continue
+            return
         # 非 ASCII 字符做百分号编码（对齐浏览器行为），
         # 避免带中文的直链在后续网络请求里以 ascii 编码崩溃
         u = urllib.parse.quote(u, safe=":/?#[]@!$&'()*+,;=%~")
@@ -28,6 +60,13 @@ def extract_urls(text: str):
         if key not in seen:
             seen.add(key)
             urls.append(u)
+
+    for m in URL_RE.findall(text):
+        add(m)
+    for m in BARE_RE.findall(text):
+        add("https://" + m)
+    for m in BV_RE.findall(text):
+        add(f"https://www.bilibili.com/video/{m}")
     return urls
 
 

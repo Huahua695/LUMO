@@ -626,6 +626,35 @@ def t_extract_urls():
     assert nurls == ["https://v.douyin.com/iRNBho6u/"], nurls
 
 
+def t_extract_urls_bare():
+    """U1：无协议头 / 裸短链 / 纯 BV 号，以及既有行为零回归"""
+    from app.url_detect import extract_urls
+    # 必须保持通过的既有行为（中文口令剥离、紧跟中文截断、一行多个）
+    assert extract_urls("7.43 复制打开抖音，看看 https://v.douyin.com/abc/ 的作品") \
+        == ["https://v.douyin.com/abc/"]
+    assert extract_urls("https://v.douyin.com/abc/这个视频很好看") \
+        == ["https://v.douyin.com/abc/"]
+    assert len(extract_urls("https://a.com/1.mp4 和 https://b23.tv/xyz")) == 2
+    # 新增能力
+    assert extract_urls("www.bilibili.com/video/BV1xx411c7mD") \
+        == ["https://www.bilibili.com/video/BV1xx411c7mD"]
+    assert extract_urls("b23.tv/abc123") == ["https://b23.tv/abc123"]
+    assert extract_urls("BV1xx411c7mD") == ["https://www.bilibili.com/video/BV1xx411c7mD"]
+    # 带协议头的完整链接 + 同一个裸 BV 号：只保留原文那份，不重复
+    both = extract_urls("https://www.bilibili.com/video/BV1xx411c7mD BV1xx411c7mD")
+    assert both == ["https://www.bilibili.com/video/BV1xx411c7mD"], both
+    # 不应误抓
+    assert extract_urls("这个网站 example.org 不错") == []
+    assert extract_urls("请打开 C:\\www\\bilibili.com\\x") == []
+    # 带协议头的链接不得被裸主机规则重复匹配
+    assert extract_urls("https://www.bilibili.com/video/BV1xx411c7mD") \
+        == ["https://www.bilibili.com/video/BV1xx411c7mD"]
+    # detect_engine 对补全后的形态走既有路径
+    from app.url_detect import detect_engine
+    assert detect_engine("https://b23.tv/abc123") == "site"
+    assert detect_engine("https://www.bilibili.com/video/BV1xx411c7mD") == "site"
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1082,6 +1111,7 @@ def main():
     check("解析画质列表去重", t_dedupe_formats)
     check("直链媒体类别识别", t_url_media_kind)
     check("多 URL 提取", t_extract_urls)
+    check("无协议头/裸短链/BV号 提取", t_extract_urls_bare)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
