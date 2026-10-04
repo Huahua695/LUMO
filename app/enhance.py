@@ -10,9 +10,9 @@ import time
 
 from .base_task import BaseTask
 from .errors import friendly_error
-from .paths import ffmpeg, ffprobe, realesrgan_exe, realesrgan_model
+from .paths import ffmpeg, realesrgan_exe, realesrgan_model
 from .proc import CREATE_NO_WINDOW, stderr_target
-from .utils import IMAGE_EXTS, VIDEO_EXTS, unique_path
+from .utils import IMAGE_EXTS, VIDEO_EXTS, probe_media, unique_path
 
 JOB_PREFIX = ".sgjob_"
 
@@ -31,6 +31,18 @@ TILE_BY_MODEL = {
     "realesr-animevideov3": 512,
     "realesr-general-x4v3": 384,
 }
+
+# 预检系数（B2）：(秒 / 源百万像素 / 帧, 实测时的 m_scale)。整体估算精度约
+# ±20%，只够阈值判断，UI 只给粗粒度档位；其它倍数按 m_scale 线性放大。
+SR_SECONDS_PER_MPX = {
+    "realesr-animevideov3": (0.93, 2),
+    "realesr-general-x4v3": (2.05, 4),
+    "realesrgan-x4plus-anime": (9.1, 4),
+    "realesrgan-x4plus": (28.4, 4),
+}
+# 中间帧字节/像素，刻意保守（预检宁可误拦不可漏拦）：
+# 输出帧取实测 0.295（真人 8K）~0.461（动漫 956x1716）的上限，输入帧 0.0885 → 0.10
+OUT_BPP, IN_BPP = 0.46, 0.10
 
 
 def plan_for(mode: str, scale: int, is_video: bool) -> tuple[str, int, float]:
@@ -222,22 +234,29 @@ def run_realesrgan(task, inp: str, outp: str, model: str, m_scale: int,
 
 
 def probe_fps(src: str) -> float:
-    try:
-        r = subprocess.run(
-            [ffprobe(), "-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=r_frame_rate,avg_frame_rate",
-             "-of", "json", src],
-            capture_output=True, creationflags=CREATE_NO_WINDOW, timeout=30)
-        info = json.loads(r.stdout or b"{}")
-        rate = (info.get("streams") or [{}])[0].get("r_frame_rate") or "25/1"
-        num, _, den = rate.partition("/")
-        num, den = float(num or 25), float(den or 1) or 1.0
-        fps = num / den
-    except Exception:
-        fps = 25.0
-    if not (1 <= fps <= 240):
-        fps = 25.0
-    return fps
+    fps = probe_media(src)[3]
+    return fps if fps else 25.0
+
+
+def estimate_video_job(src: str, mode: str, scale: int) -> dict | None:
+    """估算单个视频增强任务的耗时与中间文件量。
+
+    返回 {'frames', 'gb', 'hours'}；读不到源信息时返回 None（调用方跳过预检，
+    不因估算失败而阻止任务——预检是保护措施，不能变成新的故障点）。
+    """
+    dur, w, h, fps = probe_media(src)
+    if dur <= 0 or w <= 0 or h <= 0:
+        return None
+    model, m_scale, _eff = plan_for(mode, scale, is_video=True)
+    coeff = SR_SECONDS_PER_MPX.get(model)
+    if not coeff or fps <= 0:
+        return None
+    sec_per_mpx, measured_scale = coeff
+    frames = fps * dur
+    src_px = w * h
+    hours = frames * sec_per_mpx * (src_px / 1e6) * (m_scale / measured_scale) / 3600.0
+    gb = frames * (OUT_BPP * src_px * m_scale * m_scale + IN_BPP * src_px) / 1024 ** 3
+    return {"frames": int(round(frames)), "gb": gb, "hours": hours}
 
 
 def extract_frames(src: str, frames_in: str, fps: float) -> int:

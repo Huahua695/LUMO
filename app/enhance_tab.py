@@ -1,11 +1,12 @@
 """画质增强页：三种模式、视频倍速、断点续跑恢复横幅、可折叠日志。"""
 import os
+import shutil
 import uuid
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QListWidget,
-    QPushButton, QVBoxLayout, QWidget, QProgressBar,
+    QMessageBox, QPushButton, QVBoxLayout, QWidget, QProgressBar,
 )
 
 from . import icons, theme
@@ -16,6 +17,12 @@ from .app_settings import AppSettings
 from .widgets import PathRow, SectionCard, retire_thread
 
 FILTER = "媒体文件 (*" + " *".join(sorted(IMAGE_EXTS | VIDEO_EXTS)) + ")"
+
+# B2 预检：磁盘硬阻止按估算中间文件量 ×DISK_MARGIN；
+# 预计耗时/中间文件超过任一软上限时弹二次确认
+SOFT_HOURS = 1.0
+SOFT_GB = 20.0
+DISK_MARGIN = 1.15
 
 MODES = [
     ("photo", "照片模式（风景/人像/截图）"),
@@ -54,6 +61,7 @@ class EnhanceTab(QWidget):
         self.settings = settings
         self.thread = None
         self.resume_thread = None
+        self._est_cache = {}  # (文件, 模式, 倍数) -> (mtime, 估算结果)
 
         root = QVBoxLayout(self)
         root.setContentsMargins(28, 24, 28, 20)
@@ -97,7 +105,7 @@ class EnhanceTab(QWidget):
         b1.clicked.connect(self._add_dialog)
         b2 = QPushButton("清空")
         b2.setProperty("ghost", True)
-        b2.clicked.connect(lambda: self.file_list.clear())
+        b2.clicked.connect(self._clear_files)
         brow.addWidget(b1)
         brow.addWidget(b2)
         brow.addStretch(1)
@@ -268,6 +276,37 @@ class EnhanceTab(QWidget):
     def _files(self):
         return [self.file_list.item(i).text() for i in range(self.file_list.count())]
 
+    def _clear_files(self):
+        self.file_list.clear()
+        self._update_hint()
+
+    def _estimate_totals(self, use_cache: bool = True):
+        """对列表中的视频逐个估算并求和，返回 (gb, hours)；无可估项返回 None。
+        估算失败（None）的文件直接跳过——预检不能变成新的故障点。"""
+        from .enhance import estimate_video_job
+        mode, scale = self.mode.currentData(), self.scale.currentData()
+        gb = hours = 0.0
+        n = 0
+        for f in self._files():
+            if os.path.splitext(f)[1].lower() not in VIDEO_EXTS:
+                continue
+            try:
+                mtime = os.path.getmtime(f)
+            except OSError:
+                mtime = None
+            key = (f, mode, scale)
+            hit = self._est_cache.get(key)
+            if use_cache and hit and hit[0] == mtime:
+                r = hit[1]
+            else:
+                r = estimate_video_job(f, mode, scale)
+                self._est_cache[key] = (mtime, r)
+            if r:
+                gb += r["gb"]
+                hours += r["hours"]
+                n += 1
+        return (gb, hours) if n else None
+
     def _update_hint(self):
         files = self._files()
         has_video = any(os.path.splitext(f)[1].lower() in VIDEO_EXTS for f in files)
@@ -280,6 +319,15 @@ class EnhanceTab(QWidget):
             else:
                 tip = ("⚠ 真人/照片模式下视频固定输出 2 倍：使用通用模型逐帧处理，"
                        "速度中等；如内容其实是动漫，请改用动漫·动画模式（快好几倍）。")
+            # B2 预检提示：粗粒度档位（估算精度约 ±20%，不给精确数字）
+            est = self._estimate_totals()
+            if est:
+                gb, hours = est
+                size_txt = f"{gb:.0f} GB" if gb >= 1 else "不足 1 GB"
+                if hours >= 1:
+                    tip += f"　⚠ 预计约 {hours:.1f} 小时 · 中间文件约 {size_txt}"
+                else:
+                    tip += f"　预计约 {max(1, round(hours * 60))} 分钟 · 中间文件约 {size_txt}"
         else:
             if mode == "photo":
                 tip = "照片模式：4 倍超分后精细缩放到目标倍数，人像/风景质量最好。"
@@ -300,6 +348,40 @@ class EnhanceTab(QWidget):
         self.log_toggle.setText("收起日志 ▾" if show else "查看日志 ▸")
 
     # ---------- 运行 ----------
+    def _precheck(self) -> bool:
+        """B2 预检：磁盘不足硬阻止；预计耗时/中间文件超软上限时二次确认。
+        返回 False = 已给出提示或用户取消，不启动。估算不出则放行（预检
+        是保护措施，不能因为估算不出来就把能跑的任务挡住）。"""
+        est = self._estimate_totals(use_cache=False)
+        if not est:
+            return True
+        gb, hours = est
+        free = None
+        try:
+            free = shutil.disk_usage(self.settings.enhance_dir).free / 1024 ** 3
+        except OSError:
+            pass
+        need = gb * DISK_MARGIN
+        if free is not None and need > free:
+            theme.retag(self.status, "err")
+            self.status.setText(
+                f"磁盘空间不足：预计需要约 {need:.0f} GB（含余量），"
+                f"目标盘仅剩 {free:.0f} GB")
+            return False
+        if hours > SOFT_HOURS or gb > SOFT_GB:
+            box = QMessageBox(self)
+            box.setWindowTitle("任务较大，确认继续？")
+            box.setText(
+                f"预计耗时约 {hours:.1f} 小时，中间文件约 {gb:.0f} GB"
+                + (f"，目标盘剩余 {free:.0f} GB" if free is not None else "")
+                + "。\n\n可先用「剪切」页截取片段，或改用动漫·动画模式（快好几倍）。")
+            go = box.addButton("继续增强", QMessageBox.ButtonRole.YesRole)
+            box.addButton("取消", QMessageBox.ButtonRole.NoRole)
+            box.exec()
+            if box.clickedButton() is not go:
+                return False
+        return True
+
     def _start(self):
         files = self._files()
         if not files:
@@ -311,6 +393,8 @@ class EnhanceTab(QWidget):
         except Exception as e:
             theme.retag(self.status, "err")
             self.status.setText(friendly_error(e, "输出位置不可用"))
+            return
+        if not self._precheck():
             return
         from .enhance import EnhanceTask
         self.thread = EnhanceTask(uuid.uuid4().hex[:8], files,

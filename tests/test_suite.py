@@ -655,6 +655,33 @@ def t_extract_urls_bare():
     assert detect_engine("https://www.bilibili.com/video/BV1xx411c7mD") == "site"
 
 
+def t_estimate_video_job():
+    """B2 预检估算：用 E2E2 实测样本（8 秒 1080x1920 真人·通用）回代。
+    实测：中间文件 1.9 GB / 耗时 843 s / 195 帧（24fps×8s=192）。"""
+    from app.enhance import estimate_video_job
+    d = tempfile.mkdtemp()
+    src = os.path.join(d, "v.mp4")
+    gen_test_video(src, seconds=8, size="1080x1920", fps=24)
+    r = estimate_video_job(src, "real", 2)
+    assert r, "估算不应返回 None"
+    assert abs(r["frames"] - 192) <= 3, f"frames={r['frames']}"
+    # 磁盘估算刻意保守：应落在实测 1.9GB 的 1.3~2.0 倍区间（宁可误拦不可漏拦）
+    assert 1.3 <= r["gb"] / 1.9 <= 2.0, f"gb={r['gb']:.2f}"
+    # 耗时估算按实测 843s 校验，系数拟合 ±3%、整体精度约 ±20%
+    assert 0.8 <= (r["hours"] * 3600) / 843 <= 1.3, f"hours={r['hours']:.3f}"
+    # 读不到源信息 → None，调用方跳过预检（预检不能变成新故障点）
+    assert estimate_video_job(os.path.join(d, "不存在.mp4"), "real", 2) is None
+    # 动漫模式（m_scale 随用户倍数、系数按 m_scale/2 线性放大）：4x 耗时应为 2x 的 2 倍
+    r2a = estimate_video_job(src, "anime", 2)
+    r2 = estimate_video_job(src, "anime", 4)
+    assert r2a and r2, "动漫模式估算不应返回 None"
+    assert abs(r2["hours"] / r2a["hours"] - 2.0) < 0.01, \
+        f"anime 4x/2x = {r2['hours'] / r2a['hours']:.3f}，应为线性 2.0"
+    # 动漫 4x（0.93 s/Mpx）仍应快于真人 2x（2.05 s/Mpx、同 m_scale=4）：系数表在起作用
+    assert r2["hours"] < r["hours"], "动漫 4x 不应比真人模式更慢"
+    shutil.rmtree(d)
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1112,6 +1139,7 @@ def main():
     check("直链媒体类别识别", t_url_media_kind)
     check("多 URL 提取", t_extract_urls)
     check("无协议头/裸短链/BV号 提取", t_extract_urls_bare)
+    check("增强预检估算（E2E2 回代）", t_estimate_video_job)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)

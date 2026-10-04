@@ -1,9 +1,13 @@
 """通用小工具。"""
+import json
 import os
 import re
 import subprocess
 import time
 from urllib.parse import unquote, urlparse
+
+from .paths import ffprobe
+from .proc import CREATE_NO_WINDOW
 
 DEFAULT_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -21,6 +25,39 @@ IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".webp", ".bmp"}
 VIDEO_EXTS = {".mp4", ".mkv", ".webm", ".mov", ".avi", ".flv", ".ts", ".m4v", ".wmv"}
 
 ILLEGAL_CHARS = re.compile(r'[\\/:*?"<>|]')
+
+
+def probe_media(src: str) -> tuple[float, int, int, float]:
+    """返回 (时长秒, 宽, 高, fps)。时长/宽高读不到时为 0。
+
+    fps 保留 probe_fps 的 r_frame_rate 语义（B1 已撤销，不改 VFR）：
+    1~240 之外视为无效、整体兜底 25.0。一次 ffprobe 取全四项，
+    供增强预检使用（此前 dur/fps 分属 cut_engine 与 enhance 各起一个进程）。
+    """
+    try:
+        r = subprocess.run(
+            [ffprobe(), "-v", "error", "-show_entries",
+             "stream=width,height,r_frame_rate:format=duration",
+             "-of", "json", src],
+            capture_output=True, creationflags=CREATE_NO_WINDOW, timeout=30)
+        info = json.loads(r.stdout or b"{}")
+    except Exception:
+        return 0.0, 0, 0, 0.0
+    dur = float((info.get("format") or {}).get("duration") or 0)
+    w = h = 0
+    fps = 0.0
+    for s in info.get("streams") or []:
+        if not w and s.get("width"):
+            w, h = int(s["width"]), int(s.get("height") or 0)
+        if not fps and s.get("r_frame_rate"):
+            num, _, den = (s["r_frame_rate"] or "").partition("/")
+            try:
+                f = float(num or 25) / (float(den or 1) or 1.0)
+                if 1 <= f <= 240:
+                    fps = f
+            except (ValueError, ZeroDivisionError):
+                pass
+    return dur, w, h, fps or 25.0
 
 
 def sanitize_name(name: str, max_len: int = 120) -> str:
