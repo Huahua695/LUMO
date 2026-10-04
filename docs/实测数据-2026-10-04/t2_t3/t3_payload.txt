@@ -1,0 +1,1 @@
+https://test-streams.mux.dev/x36xhzz/url_0/193039199_mp4_h264_aac_hd_7.m3u8#sgref=http%3A%2F%2F127.0.0.1%3A8931%2Fplayer.html%3Fsrc%3Dhttps%253A%252F%252Ftest-streams.mux.dev%252Fx36xhzz%252Fx36xhzz.m3u8
