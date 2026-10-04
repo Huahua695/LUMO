@@ -8,6 +8,7 @@ import threading
 import time
 
 from .base_task import BaseTask
+from .cookiejar import build_headers
 from .errors import friendly_error
 from .paths import m3u8dl_exe
 from .proc import CREATE_NO_WINDOW, stderr_target
@@ -31,13 +32,20 @@ def default_save_name(url: str, audio_only: bool = False) -> str:
 
 
 class M3u8DownloadTask(BaseTask):
-    def __init__(self, task_id, url, save_dir, name="", fmt="auto", parent=None):
+    def __init__(self, task_id, url, save_dir, name="", fmt="auto",
+                 cookie_file="", proxy="", referer="", parent=None):
         super().__init__(task_id, parent)
-        self.url = url.strip()
+        # m3u8dl:// 是 N_m3u8DL-CLI 自己的协议注册功能在浏览器生态里留下的
+        # 链接前缀，CLI 本身不认——剥掉再传。本项目绝不调用
+        # --registerUrlProtocol（写注册表，违背 README 隐私承诺）
+        self.url = (url or "").strip().removeprefix("m3u8dl://").strip()
         self.save_dir = save_dir
         self.name = name
         self.fmt = (fmt or "auto").lower()
         self.audio_only = self.fmt in ("mp3", "m4a")
+        self.cookie_file = cookie_file or ""
+        self.proxy = (proxy or "").strip()
+        self.referer = (referer or "").strip()
 
     def run(self):
         save_name = self.name or default_save_name(self.url, self.audio_only)
@@ -48,6 +56,11 @@ class M3u8DownloadTask(BaseTask):
             "--enableDelAfterDone",
             "--enableMuxFastStart",
         ]
+        headers = build_headers(self.cookie_file, self.url, self.referer)
+        if headers:
+            cmd += ["--headers", headers]
+        if self.proxy:
+            cmd += ["--proxyAddress", self.proxy]
         if self.audio_only:
             cmd.append("--enableAudioOnly")
         last_emit = [0.0]

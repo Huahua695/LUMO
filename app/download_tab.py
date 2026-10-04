@@ -12,8 +12,10 @@ from . import icons, theme
 from .errors import friendly_error
 from .theme import elide
 from .douyin import is_douyin
-from .url_detect import detect_engine, extract_urls, url_media_kind, ENGINE_LABEL
+from .url_detect import detect_engine, extract_urls, split_referer, url_media_kind, ENGINE_LABEL
 from .paths import tools_ready
+from .utils import human_size
+from .netenv import effective_proxy
 from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow, retire_thread
 
 MAX_CONCURRENT = 3
@@ -597,6 +599,8 @@ class DownloadTab(QWidget):
     def _spawn(self, eng, url):
         tid = self.next_id
         self.next_id += 1
+        media_url, ref = split_referer(url)  # 嗅探脚本用 #sgref= 携带来源页
+        proxy = effective_proxy(self.settings.proxy_mode, self.settings.proxy_url)
         if eng == "site" and is_douyin(url):
             from .direct_dl import DouyinDownloadTask
             import time
@@ -609,25 +613,27 @@ class DownloadTab(QWidget):
                                     play_url=play_url, name=title)
         elif eng == "direct":
             from .direct_dl import DirectDownloadTask
-            th = DirectDownloadTask(tid, url, self.settings.save_dir,
-                                    fmt=self.fmt.currentData())
+            th = DirectDownloadTask(tid, media_url, self.settings.save_dir,
+                                    fmt=self.fmt.currentData(),
+                                    cookie_file=self.settings.cookie_file,
+                                    proxy=proxy, referer=ref)
         elif eng == "m3u8":
             from .m3u8_dl import M3u8DownloadTask
-            th = M3u8DownloadTask(tid, url, self.settings.save_dir,
-                                  fmt=self.fmt.currentData())
+            th = M3u8DownloadTask(tid, media_url, self.settings.save_dir,
+                                  fmt=self.fmt.currentData(),
+                                  cookie_file=self.settings.cookie_file,
+                                  proxy=proxy, referer=ref)
         else:
             from .ytdlp_dl import YtdlpTask
             format_id = None
             if (eng == "site" and self._probe_url == url
                     and self.fmt.currentData() not in ("mp3", "m4a")):
                 format_id = self._probe_format_id
-            from .netenv import effective_proxy
-            th = YtdlpTask(tid, url, self.settings.save_dir,
+            th = YtdlpTask(tid, media_url, self.settings.save_dir,
                            quality=self.quality.currentData(),
                            fmt=self.fmt.currentData(), format_id=format_id,
                            cookie_file=self.settings.cookie_file,
-                           proxy=effective_proxy(self.settings.proxy_mode,
-                                                 self.settings.proxy_url))
+                           proxy=proxy, referer=ref)
 
         item = QListWidgetItem()
         row = TaskProgressRow(tid)

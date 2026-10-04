@@ -743,6 +743,16 @@ def t_cookiejar():
     assert h2 == "Cookie:b=notforA", h2
     h3 = build_headers("", "https://www.a.com/v.m3u8", "")
     assert h3 == "", h3  # 无 Cookie 无 Referer → ''（调用方不加 --headers）
+    # T2 实测：| 是 CLI 硬分隔符且无法转义（截断 + 剩余部分注入新头）
+    # → 值含 | 的 Cookie 条目 / Referer 必须被丢弃
+    with open(f, "a", encoding="utf-8") as fh:
+        fh.write(f".a.com\tTRUE\t/\tFALSE\t{now + 3600}\tbad\tha|ha\n")
+    h4 = build_headers(f, "https://www.a.com/v.m3u8", "https://p.com/x|y")
+    assert "bad" not in h4 and "ha|ha" not in h4, h4
+    assert "Referer" not in h4, h4           # referer 含 | 整条丢弃
+    assert "sid=ABC123" in h4, h4            # 正常条目保留
+    h5 = build_headers(f, "https://www.a.com/v.m3u8", "")
+    assert h5.startswith("Cookie:") and "bad" not in h5, h5
     shutil.rmtree(d)
 
 
@@ -778,6 +788,84 @@ def t_split_referer():
     assert url_media_kind("http://a/x.FLAC") == "audio"
     assert url_media_kind("https://b.com/page?id=1") is None
     assert SGREF == "#sgref="
+
+
+def t_m3u8_task_wiring():
+    """S1.1：m3u8dl:// 前缀在任务内剥离（CLI 不认该前缀）；参数落位"""
+    from app.m3u8_dl import M3u8DownloadTask
+    t = M3u8DownloadTask(1, "m3u8dl://https://a.com/x.m3u8", os.path.normpath("/tmp"),
+                         referer="https://p.com/watch", proxy="http://127.0.0.1:7890")
+    assert t.url == "https://a.com/x.m3u8", t.url
+    assert t.referer == "https://p.com/watch"
+    assert t.proxy == "http://127.0.0.1:7890"
+    assert t.cookie_file == ""
+    # 普通链接原样；不含前缀的剥离对既有形态零回归
+    t2 = M3u8DownloadTask(2, "https://a.com/y.m3u8", os.path.normpath("/tmp"))
+    assert t2.url == "https://a.com/y.m3u8" and t2.referer == ""
+
+
+def t_direct_referer_cookie_headers():
+    """S1.2：显式 Referer 与同域 Cookie 到达服务器；跨域 Cookie 不发送；
+    Range 续传的第二次请求走同一 opener（同样带 Referer/Cookie）——T7 逻辑层"""
+    from app.direct_dl import DirectDownloadTask
+    payload = bytes(range(256)) * 2048  # 512 KB
+    seen = {"referer": [], "cookie": [], "range": []}
+
+    class H(BaseHTTPRequestHandler):
+        def do_GET(self):
+            seen["referer"].append(self.headers.get("Referer"))
+            seen["cookie"].append(self.headers.get("Cookie") or "")
+            rng = self.headers.get("Range")
+            if rng:
+                seen["range"].append(rng)
+                start = int(re.match(r"bytes=(\d+)-", rng).group(1))
+                self.send_response(206)
+                self.send_header("Content-Range",
+                                 f"bytes {start}-{len(payload)-1}/{len(payload)}")
+                self.send_header("Content-Length", str(len(payload) - start))
+                self.end_headers()
+                self.wfile.write(payload[start:])
+            else:
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(payload)))
+                self.end_headers()
+                self.wfile.write(payload)
+
+        def log_message(self, *a):
+            pass
+
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    port = srv.server_address[1]
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        d = tempfile.mkdtemp()
+        ck = os.path.join(d, "cookies.txt")
+        now = int(time.time())
+        with open(ck, "w", encoding="utf-8") as f:
+            f.write(f"127.0.0.1\tFALSE\t/\tFALSE\t{now + 600}\tsid\tLOCAL123\n"
+                    f".other.com\tTRUE\t/\tFALSE\t{now + 600}\tx\tMUSTNOTSEND\n")
+        # 预置 .part 触发续传路径
+        part = os.path.join(d, "v.mp4.part")
+        with open(part, "wb") as f:
+            f.write(payload[:100 * 1024])
+        t = DirectDownloadTask(
+            94, f"http://127.0.0.1:{port}/v.mp4", d,
+            cookie_file=ck, referer="https://www.ref.com/page")
+        events = run_task_until(t, 60)
+        done = [e for e in events if e["event"] == "done"]
+        assert done, f"未完成: {events[-1] if events else '无事件'}"
+        assert open(done[0]["path"], "rb").read() == payload, "内容不一致"
+        assert seen["referer"] and \
+            all(r == "https://www.ref.com/page" for r in seen["referer"]), \
+            f"Referer 未按用户指定值发送: {seen['referer']}"
+        assert seen["range"], "未走 Range 续传"
+        assert seen["cookie"] and \
+            all("sid=LOCAL123" in c for c in seen["cookie"]), seen["cookie"]
+        assert all("MUSTNOTSEND" not in c for c in seen["cookie"]), \
+            "★ 跨域 Cookie 泄漏"
+        shutil.rmtree(d)
+    finally:
+        srv.shutdown()
 
 
 _DY_SAMPLE_DATA = {
@@ -933,6 +1021,9 @@ def t_download_tab_batch():
         s.save_dir = tempfile.mkdtemp()
         s.dl_quality = "best"
         s.dl_format = "auto"
+        s.cookie_file = ""
+        s.proxy_mode = "off"
+        s.proxy_url = ""
         tab = DownloadTab(s)
         base = f"http://127.0.0.1:{srv.server_address[1]}"
         text = "\n".join(f"{base}/f{i}.mp4" for i in range(1, 6))
@@ -1230,6 +1321,8 @@ def main():
     check("任务档案读写/扫描", t_job_descriptors)
     check("任务档案 running 可发现+退出兜底", t_job_running_recoverable)
     check("m3u8 兜底名防同秒冲突", t_m3u8_save_names)
+    check("m3u8 任务参数与 m3u8dl:// 剥离", t_m3u8_task_wiring)
+    check("直链 Referer/Cookie/续传同 opener", t_direct_referer_cookie_headers)
     check("输出帧完整性校验", t_frame_integrity)
     check("时间解析", t_parse_time)
     check("yt-dlp 画质/格式参数", t_build_ytdlp_opts)

@@ -102,12 +102,21 @@ def build_headers(cookie_file: str, url: str, referer: str) -> str:
     """拼 N_m3u8DL-CLI 的 --headers 值：`key:value`，多个用 `|` 分隔。
     Cookie 只取与下载 URL 同域的条目——CLI 会把这组头发给清单与全部分片
     （可能在其它 CDN 域上），跨域 Cookie 不带是隐私要求。
-    无任何头时返回 ''（调用方不加 --headers 参数）。"""
-    parts = []
+
+    T2 实测（本地 HTTP 服务打印 CLI 实际请求头，2026-10-04）：
+    - 值含 `;`、空格、`:` 均逐字到达（key 按第一个冒号切分）；
+    - `|` 是硬分隔符且无法转义：值含 `|` 会被截断，剩余部分还会被
+      当作新的头注入。因此值含 `|` 的条目一律丢弃。
+    无任何头时返回 ''（调用方不加 --headers 参数）。
+    """
     referer = (referer or "").strip()
-    if referer:
-        parts.append(f"Referer:{referer}")
     cookie = cookie_header(cookie_file, url)
+    if cookie:
+        # 丢掉值含 | 的条目：CLI 无法表达，且会截断/注入（T2 实测）
+        cookie = "; ".join(p for p in cookie.split("; ") if "|" not in p)
+    parts = []
+    if referer and "|" not in referer:
+        parts.append(f"Referer:{referer}")
     if cookie:
         parts.append(f"Cookie:{cookie}")
     return "|".join(parts)

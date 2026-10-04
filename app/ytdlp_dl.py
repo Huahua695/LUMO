@@ -222,7 +222,8 @@ class ProbeTask(BaseTask):
 
 class YtdlpTask(BaseTask):
     def __init__(self, task_id, url, save_dir, quality="best", fmt="auto",
-                 format_id=None, cookie_file="", proxy="", parent=None):
+                 format_id=None, cookie_file="", proxy="", referer="",
+                 parent=None):
         super().__init__(task_id, parent)
         self.url = url.strip()
         self.save_dir = save_dir
@@ -231,6 +232,7 @@ class YtdlpTask(BaseTask):
         self.format_id = format_id
         self.cookie_file = cookie_file or ""
         self.proxy = proxy or ""
+        self.referer = (referer or "").strip()  # 嗅探脚本 #sgref= 携带的来源页
 
     def run(self):
         import yt_dlp
@@ -304,6 +306,9 @@ class YtdlpTask(BaseTask):
             opts["cookiefile"] = self.cookie_file
         if self.proxy:
             opts["proxy"] = self.proxy
+        if self.referer:
+            # 不覆盖 std_headers：yt-dlp 会把 http_headers 与默认头按键合并
+            opts["http_headers"] = {"Referer": self.referer}
         opts.update(build_ytdlp_opts(self.quality, self.fmt, self.format_id))
         try:
             self._emit(event="started", name=self.url[:80])

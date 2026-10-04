@@ -6,6 +6,7 @@ import urllib.request
 import urllib.error
 
 from .base_task import BaseTask
+from .cookiejar import cookie_header
 from .errors import friendly_error
 from .media_convert import convert_media
 from .utils import DEFAULT_UA, filename_from_url, unique_path, now_tag, sanitize_name
@@ -44,18 +45,32 @@ def _name_from_disposition(cd: str) -> str:
 
 class DirectDownloadTask(BaseTask):
     def __init__(self, task_id, url, save_dir, fmt="auto", name="",
-                 parent=None):
+                 cookie_file="", proxy="", referer="", parent=None):
         super().__init__(task_id, parent)
         self.url = url.strip()
         self.save_dir = save_dir
         self.fmt = (fmt or "auto").lower()
         self._name_hint = (name or "").strip()  # 调用方给定的文件名（如抖音标题）
+        self.cookie_file = cookie_file or ""
+        self.referer = (referer or "").strip()  # 用户/嗅探脚本显式给的来源页
+        # 探测 / Range 续传 / 正式下载必须共用同一个 opener——
+        # 续传的第二次请求换 opener 会绕过代理
+        handlers = []
+        proxy = (proxy or "").strip()
+        if proxy:
+            handlers.append(urllib.request.ProxyHandler(
+                {"http": proxy, "https": proxy}))
+        self._opener = urllib.request.build_opener(*handlers)
 
     def _open(self, referer, range_start=None):
         h = {"User-Agent": DEFAULT_UA, "Referer": referer, "Accept": "*/*"}
+        if self.cookie_file:
+            ck = cookie_header(self.cookie_file, self.url)
+            if ck:
+                h["Cookie"] = ck
         if range_start is not None:
             h["Range"] = f"bytes={range_start}-"
-        return urllib.request.urlopen(
+        return self._opener.open(
             urllib.request.Request(self.url, headers=h), timeout=30)
 
     def run(self):
@@ -64,8 +79,9 @@ class DirectDownloadTask(BaseTask):
         note = ""
         try:
             origin = "{0.scheme}://{0.netloc}".format(urllib.parse.urlparse(self.url))
+            ref = self.referer or origin  # 显式给了 Referer 才用，否则保持原推断
             # 1) 探测：内容类型 / 文件名与总大小
-            with self._open(origin) as resp:
+            with self._open(ref) as resp:
                 total = int(resp.headers.get("Content-Length") or 0)
                 ctype = (resp.headers.get("Content-Type") or "").split(";")[0]
                 ctype = ctype.strip().lower()
@@ -91,7 +107,7 @@ class DirectDownloadTask(BaseTask):
                 have = os.path.getsize(tmp)
                 if have > 0:
                     try:
-                        resp2 = self._open(origin, range_start=have)
+                        resp2 = self._open(ref, range_start=have)
                     except urllib.error.HTTPError as e:
                         if e.code == 416:
                             # 断点超出文件大小：半成品不可信，删掉重下
@@ -110,10 +126,10 @@ class DirectDownloadTask(BaseTask):
 
             # 3) 打开正式下载流
             if resumed:
-                resp3 = self._open(origin, range_start=done)
+                resp3 = self._open(ref, range_start=done)
             else:
                 done = 0
-                resp3 = self._open(origin)
+                resp3 = self._open(ref)
 
             self._emit(event="started", name=os.path.basename(final),
                        resumed=resumed)
