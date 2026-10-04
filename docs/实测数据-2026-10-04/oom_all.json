@@ -1,0 +1,180 @@
+[
+ {
+  "tag": "t1024_s4",
+  "tile": 1024,
+  "scale": 4,
+  "rc": 0,
+  "fail_after_s": 225.04,
+  "frames_out": 24,
+  "frames_ffd9_ok": 24,
+  "frames_truncated": 0,
+  "stderr_full": "[0 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=0  bugcopc=0  bugihfa=0\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=92  bugcopc=0  bugihfa=0\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n0.00%\r\n8.33%\r\n16.67%\r\n25.00%\r\n33.33%\r\n41.67%\r\n50.00%\r\n58.33%\r\n66.67%\r\n75.00%\r\n83.33%\r\n91.67%\r\n"
+ },
+ {
+  "tag": "t2048_s4",
+  "tile": 2048,
+  "scale": 4,
+  "rc": 0,
+  "fail_after_s": 680.32,
+  "frames_out": 24,
+  "frames_ffd9_ok": 24,
+  "frames_truncated": 0,
+  "stderr_full": "[0 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=0  bugcopc=0  bugihfa=0\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=56  bugcopc=0  bugihfa=0\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n"
+ },
+ {
+  "k": 4,
+  "outcome": "no_oom_within_300s",
+  "fail_after_s": null,
+  "failed_idx": null,
+  "rc": null,
+  "stderr_full": null,
+  "commit_max_MB": 29432,
+  "frames_0": {
+   "n": 10,
+   "ok": 10,
+   "bad": 0
+  },
+  "frames_1": {
+   "n": 7,
+   "ok": 7,
+   "bad": 0
+  },
+  "frames_2": {
+   "n": 10,
+   "ok": 10,
+   "bad": 0
+  },
+  "frames_3": {
+   "n": 7,
+   "ok": 7,
+   "bad": 0
+  }
+ },
+ {
+  "k": 6,
+  "outcome": "watchdog_commit_limit",
+  "fail_after_s": null,
+  "failed_idx": null,
+  "rc": null,
+  "stderr_full": null,
+  "commit_max_MB": 33975,
+  "frames_0": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_1": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_2": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_3": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_4": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_5": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  }
+ },
+ {
+  "k": 8,
+  "outcome": "watchdog_commit_limit",
+  "fail_after_s": null,
+  "failed_idx": null,
+  "rc": null,
+  "stderr_full": null,
+  "commit_max_MB": 37867,
+  "frames_0": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_1": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_2": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_3": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_4": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_5": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_6": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  },
+  "frames_7": {
+   "n": 0,
+   "ok": 0,
+   "bad": 0
+  }
+ },
+ {
+  "k": 6,
+  "outcome": "no_oom_within_300s",
+  "fail_after_s": null,
+  "failed_idx": null,
+  "rc": null,
+  "stderr_full": null,
+  "commit_max_MB": 29506,
+  "frames_0": {
+   "n": 6,
+   "ok": 6,
+   "bad": 0
+  },
+  "frames_1": {
+   "n": 7,
+   "ok": 7,
+   "bad": 0
+  },
+  "frames_2": {
+   "n": 6,
+   "ok": 6,
+   "bad": 0
+  },
+  "frames_3": {
+   "n": 6,
+   "ok": 6,
+   "bad": 0
+  },
+  "frames_4": {
+   "n": 7,
+   "ok": 7,
+   "bad": 0
+  },
+  "frames_5": {
+   "n": 6,
+   "ok": 6,
+   "bad": 0
+  }
+ }
+]

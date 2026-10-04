@@ -1,0 +1,30 @@
+{
+ "tag": "s3_realesr-general-x4v3_t384_jdef_r3",
+ "cmd": [
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
+  "-i",
+  "E:\\bench_tmp\\assets\\in_1280x720",
+  "-o",
+  "E:\\bench_tmp\\work\\s3out_s3_realesr-general-x4v3_t384_jdef_r3",
+  "-n",
+  "realesr-general-x4v3",
+  "-s",
+  "4",
+  "-m",
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\models",
+  "-f",
+  "jpg",
+  "-t",
+  "384"
+ ],
+ "rc": 0,
+ "wall_s": 43.162,
+ "frames_out": 24,
+ "fps": 0.556,
+ "gpu_dedicated_max_MB": 0.0,
+ "gpu_shared_max_MB": 218.5,
+ "gpu_nonlocal_max_MB": 0.0,
+ "gpu_total_max_MB": 218.5,
+ "sys_commit_max_MB": 20628,
+ "stderr_tail": "0%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n"
+}

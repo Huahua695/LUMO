@@ -1,0 +1,49 @@
+{
+ "k": 8,
+ "outcome": "watchdog_commit_limit",
+ "fail_after_s": null,
+ "failed_idx": null,
+ "rc": null,
+ "stderr_full": null,
+ "commit_max_MB": 37867,
+ "frames_0": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_1": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_2": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_3": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_4": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_5": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_6": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ },
+ "frames_7": {
+  "n": 0,
+  "ok": 0,
+  "bad": 0
+ }
+}

@@ -1,0 +1,11 @@
+{
+ "build_rc": 0,
+ "internal_b2_MB": 141.9,
+ "internal_b5_MB": 149.9,
+ "exe_b2_MB": 9.94,
+ "exe_b5_MB": 9.26,
+ "pyz_b2_MB": null,
+ "pyz_b5_MB": null,
+ "selftest_rc": 0,
+ "selftest_s": 2.5
+}

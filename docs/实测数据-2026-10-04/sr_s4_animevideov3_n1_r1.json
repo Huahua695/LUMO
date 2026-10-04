@@ -1,0 +1,30 @@
+{
+ "tag": "s4_animevideov3_n1_r1",
+ "cmd": [
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
+  "-i",
+  "E:\\bench_tmp\\work\\s4\\in_s4_animevideov3_n1_r1_1",
+  "-o",
+  "E:\\bench_tmp\\work\\s4\\out_s4_animevideov3_n1_r1",
+  "-n",
+  "realesr-animevideov3",
+  "-s",
+  "2",
+  "-m",
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\models",
+  "-f",
+  "jpg",
+  "-t",
+  "256"
+ ],
+ "rc": 0,
+ "wall_s": 0.737,
+ "frames_out": 1,
+ "fps": 1.357,
+ "gpu_dedicated_max_MB": 0.0,
+ "gpu_shared_max_MB": 0.0,
+ "gpu_nonlocal_max_MB": 0.0,
+ "gpu_total_max_MB": 0.0,
+ "sys_commit_max_MB": 19946,
+ "stderr_tail": "[0 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=0  bugcopc=0  bugihfa=0\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=0  bugcopc=0  bugihfa=0\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n"
+}

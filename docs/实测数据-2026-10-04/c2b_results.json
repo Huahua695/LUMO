@@ -1,0 +1,51 @@
+[
+ {
+  "config": "qsv_gq19_fullhw_fixed",
+  "rc": 4294967256,
+  "times": [
+   0.544
+  ],
+  "mean_s": 0.544,
+  "sd_s": 0,
+  "size_MB": null
+ },
+ {
+  "config": "qsv_gq19_dechw",
+  "rc": 0,
+  "times": [
+   3.04,
+   2.641,
+   3.076
+  ],
+  "mean_s": 2.919,
+  "sd_s": 0.242,
+  "size_MB": 24.78,
+  "ssim_vs_source": 0.992476
+ },
+ {
+  "config": "qsv_gq16_softdec",
+  "rc": 0,
+  "times": [
+   2.251,
+   2.155,
+   2.151
+  ],
+  "mean_s": 2.186,
+  "sd_s": 0.057,
+  "size_MB": 34.4,
+  "ssim_vs_source": 0.993689
+ },
+ {
+  "config": "qsv_gq23_softdec",
+  "rc": 0,
+  "times": [
+   2.232,
+   2.165,
+   2.1
+  ],
+  "mean_s": 2.166,
+  "sd_s": 0.066,
+  "size_MB": 15.61,
+  "ssim_vs_source": 0.990424
+ }
+]

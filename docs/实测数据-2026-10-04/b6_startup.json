@@ -1,0 +1,38 @@
+{
+ "dist": [
+  {
+   "window_s": 0.96,
+   "ws_priv_MB": "154.7 101.1",
+   "rc": 1
+  },
+  {
+   "window_s": 0.87,
+   "ws_priv_MB": "155.3 101.5",
+   "rc": 1
+  },
+  {
+   "window_s": 0.89,
+   "ws_priv_MB": "154.6 100.9",
+   "rc": 1
+  }
+ ],
+ "source": [
+  {
+   "window_s": 120.09,
+   "ws_priv_MB": "5.7 1.1",
+   "rc": 1
+  },
+  {
+   "window_s": 120.06,
+   "ws_priv_MB": "5.4 1.1",
+   "rc": 1
+  },
+  {
+   "window_s": 120.13,
+   "ws_priv_MB": "5.4 1.1",
+   "rc": 1
+  }
+ ],
+ "dist_window_mean_s": 0.91,
+ "source_window_mean_s": 120.09
+}

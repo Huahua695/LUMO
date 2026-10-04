@@ -1,0 +1,65 @@
+{
+ "static": [
+  {
+   "file": "_internal\\_hashlib.pyd",
+   "size_MB": 0.07,
+   "imports": [
+    "libcrypto-3.dll"
+   ]
+  },
+  {
+   "file": "_internal\\_ssl.pyd",
+   "size_MB": 0.17,
+   "imports": [
+    "libcrypto-3.dll",
+    "libssl-3.dll"
+   ]
+  },
+  {
+   "file": "_internal\\libssl-3-x64.dll",
+   "size_MB": 0.98,
+   "imports": [
+    "libcrypto-3-x64.dll"
+   ]
+  },
+  {
+   "file": "_internal\\libssl-3.dll",
+   "size_MB": 0.76,
+   "imports": [
+    "libcrypto-3.dll"
+   ]
+  },
+  {
+   "file": "_internal\\PySide6\\Qt6Multimedia.dll",
+   "size_MB": 1.23,
+   "imports": [
+    "qt6network.dll"
+   ]
+  },
+  {
+   "file": "_internal\\PySide6\\QtNetwork.pyd",
+   "size_MB": 0.96,
+   "imports": [
+    "qt6network.dll"
+   ]
+  }
+ ],
+ "summary": {
+  "import_libcrypto3": [
+   "_internal\\_hashlib.pyd",
+   "_internal\\_ssl.pyd",
+   "_internal\\libssl-3.dll"
+  ],
+  "import_libssl3": [
+   "_internal\\_ssl.pyd"
+  ],
+  "import_libcrypto3_x64": [
+   "_internal\\libssl-3-x64.dll"
+  ],
+  "import_libssl3_x64": [],
+  "import_qt6network": [
+   "_internal\\PySide6\\Qt6Multimedia.dll",
+   "_internal\\PySide6\\QtNetwork.pyd"
+  ]
+ }
+}

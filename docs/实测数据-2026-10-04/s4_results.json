@@ -1,0 +1,91 @@
+{
+ "fits": [
+  {
+   "model": "realesr-animevideov3",
+   "scale": 2,
+   "tile": 256,
+   "means_by_frames": {
+    "1": 0.728,
+    "8": 3.57,
+    "24": 9.874,
+    "64": 25.773
+   },
+   "slope_s_per_frame": 0.3971,
+   "steady_fps": 2.518,
+   "load_intercept_s": 0.356
+  },
+  {
+   "model": "realesr-general-x4v3",
+   "scale": 4,
+   "tile": 256,
+   "means_by_frames": {
+    "1": 2.241,
+    "2": 4.091,
+    "4": 7.817,
+    "8": 15.242
+   },
+   "slope_s_per_frame": 1.8577,
+   "steady_fps": 0.538,
+   "load_intercept_s": 0.381
+  },
+  {
+   "model": "realesrgan-x4plus",
+   "scale": 4,
+   "tile": 256,
+   "means_by_frames": {
+    "1": 28.985,
+    "2": 56.572,
+    "4": 111.97
+   },
+   "slope_s_per_frame": 27.667,
+   "steady_fps": 0.036,
+   "load_intercept_s": 1.286
+  }
+ ],
+ "long_run": {
+  "driver": {
+   "tag": "s4_long300",
+   "cmd": [
+    "E:\\vibe项目\\newvideo\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
+    "-i",
+    "E:\\bench_tmp\\work\\s4\\in_long300_300",
+    "-o",
+    "E:\\bench_tmp\\work\\s4\\out_s4_long300",
+    "-n",
+    "realesr-animevideov3",
+    "-s",
+    "2",
+    "-m",
+    "E:\\vibe项目\\newvideo\\tools\\realesrgan\\models",
+    "-f",
+    "jpg",
+    "-t",
+    "256"
+   ],
+   "rc": 0,
+   "wall_s": 119.373,
+   "frames_out": 300,
+   "fps": 2.513,
+   "gpu_dedicated_max_MB": 0.0,
+   "gpu_shared_max_MB": 111.3,
+   "gpu_nonlocal_max_MB": 0.0,
+   "gpu_total_max_MB": 111.3,
+   "sys_commit_max_MB": 20090,
+   "stderr_tail": "0%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n0.00%\r\n12.50%\r\n25.00%\r\n37.50%\r\n50.00%\r\n62.50%\r\n75.00%\r\n87.50%\r\n"
+  },
+  "segments": {
+   "frames": 300,
+   "first100_fps": 2.519,
+   "last100_fps": 2.496,
+   "overall_fps": 2.513
+  },
+  "mtimes_head": [
+   1791071825.526,
+   1791071825.931,
+   1791071826.331,
+   1791071826.73,
+   1791071827.13
+  ],
+  "mtime_zero": 1791071825.5263708
+ }
+}

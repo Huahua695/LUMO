@@ -1,0 +1,39 @@
+{
+ "k": 6,
+ "outcome": "no_oom_within_300s",
+ "fail_after_s": null,
+ "failed_idx": null,
+ "rc": null,
+ "stderr_full": null,
+ "commit_max_MB": 29506,
+ "frames_0": {
+  "n": 6,
+  "ok": 6,
+  "bad": 0
+ },
+ "frames_1": {
+  "n": 7,
+  "ok": 7,
+  "bad": 0
+ },
+ "frames_2": {
+  "n": 6,
+  "ok": 6,
+  "bad": 0
+ },
+ "frames_3": {
+  "n": 6,
+  "ok": 6,
+  "bad": 0
+ },
+ "frames_4": {
+  "n": 7,
+  "ok": 7,
+  "bad": 0
+ },
+ "frames_5": {
+  "n": 6,
+  "ok": 6,
+  "bad": 0
+ }
+}

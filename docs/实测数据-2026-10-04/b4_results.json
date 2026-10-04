@@ -1,0 +1,67 @@
+{
+ "source_MB": 333.5,
+ "source_files": 1227,
+ "modes": [
+  {
+   "mode": "deflate_L6",
+   "compress_s": 13.4,
+   "size_MB": 163.6,
+   "ratio_pct": 49.1,
+   "files": 1227,
+   "roundtrip_files": 1227,
+   "roundtrip_ok": true,
+   "unpack_s": 2.0,
+   "zip_methods_used": [
+    8
+   ]
+  },
+  {
+   "mode": "deflate_L9",
+   "compress_s": 12.8,
+   "size_MB": 163.6,
+   "ratio_pct": 49.1,
+   "files": 1227,
+   "roundtrip_files": 1227,
+   "roundtrip_ok": true,
+   "unpack_s": 1.9,
+   "zip_methods_used": [
+    8
+   ]
+  },
+  {
+   "mode": "lzma",
+   "compress_s": 116.5,
+   "size_MB": 136.3,
+   "ratio_pct": 40.9,
+   "files": 1227,
+   "roundtrip_files": 1227,
+   "roundtrip_ok": true,
+   "unpack_s": 7.4,
+   "zip_methods_used": [
+    14
+   ]
+  },
+  {
+   "mode": "bzip2",
+   "compress_s": 20.4,
+   "size_MB": 157.6,
+   "ratio_pct": 47.3,
+   "files": 1227,
+   "roundtrip_files": 1227,
+   "roundtrip_ok": true,
+   "unpack_s": 10.1,
+   "zip_methods_used": [
+    12
+   ]
+  },
+  {
+   "mode": "7z_mx9",
+   "note": "未安装 7-Zip，未测"
+  }
+ ],
+ "bsdtar_lzma_extract_rc": 0,
+ "bsdtar_lzma_extract_files": 1227,
+ "bsdtar_err": "",
+ "expand_archive_lzma_rc": 0,
+ "expand_archive_err": ""
+}

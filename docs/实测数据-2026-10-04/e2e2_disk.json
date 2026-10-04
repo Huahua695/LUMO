@@ -1,0 +1,21 @@
+{
+ "seconds": 8.0,
+ "fps": 24.0,
+ "frames": 195,
+ "model": "realesr-general-x4v3",
+ "m_scale": 4,
+ "eff": 0.5,
+ "t_extract_s": 1.2,
+ "t_superres_s": 842.9,
+ "t_assemble_s": 26.2,
+ "frames_in_MB": 35.1,
+ "frames_in_per_frame_KB": 184.4,
+ "frames_out_MB": 1907.7,
+ "frames_out_peak_MB": 1897.7,
+ "frames_out_per_frame_KB": 10017.7,
+ "out_width": 7680,
+ "out_height": 4320,
+ "result_size_MB": 34.6,
+ "extrapolate_10min_GB": 139.7,
+ "extrapolate_10min_in_GB": 2.6
+}

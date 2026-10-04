@@ -1,0 +1,108 @@
+[
+ {
+  "config": "floor_copy",
+  "times": [
+   0.12,
+   0.102,
+   0.102
+  ],
+  "mean": 0.108,
+  "sd": 0.01
+ },
+ {
+  "config": "floor_decode",
+  "times": [
+   0.653,
+   0.643,
+   0.654
+  ],
+  "mean": 0.65,
+  "sd": 0.006
+ },
+ {
+  "config": "x264_medium",
+  "rc": 0,
+  "times": [
+   6.868,
+   7.24,
+   7.821
+  ],
+  "mean": 7.309,
+  "sd": 0.48,
+  "size_MB": 27.35,
+  "err_tail": "",
+  "ssim_vs_source": 0.993461
+ },
+ {
+  "config": "x264_veryfast",
+  "rc": 0,
+  "times": [
+   3.083,
+   3.058,
+   3.122
+  ],
+  "mean": 3.088,
+  "sd": 0.032,
+  "size_MB": 25.65,
+  "err_tail": "",
+  "ssim_vs_source": 0.992293
+ },
+ {
+  "config": "qsv_gq19_softdec",
+  "rc": 0,
+  "times": [
+   2.506,
+   2.495,
+   2.165
+  ],
+  "mean": 2.389,
+  "sd": 0.194,
+  "size_MB": 24.78,
+  "err_tail": "",
+  "ssim_vs_source": 0.992476
+ },
+ {
+  "config": "qsv_gq19_fullhw",
+  "rc": 4294967256,
+  "times": [
+   0.598
+  ],
+  "mean": 0.598,
+  "sd": 0.0,
+  "size_MB": null,
+  "err_tail": "h264_qsv @ 00000214a7408980] Could not open encoder before EOF\r\n[vost#0:0/h264_qsv @ 00000214a77b0d80] Task finished with error: Invalid argument\r\n[vost#0:0/h264_qsv @ 00000214a77b0d80] Terminating thread with error: Invalid argument\r\n[out#0/mp4 @ 00000214a5637f80] Nothing was written into output file, because at least one of its streams received no packets.\r\nframe=    0 fps=0.0 q=0.0 Lsize=       0KiB time=-00:00:04.39 bitrate=  -0.0kbits/s speed=N/A elapsed=0:00:00.06    \r\nConversion failed!\r\n"
+ },
+ {
+  "config": "qsv_gq19_vfast_fullhw",
+  "rc": 4294967256,
+  "times": [
+   0.545
+  ],
+  "mean": 0.545,
+  "sd": 0.0,
+  "size_MB": null,
+  "err_tail": "h264_qsv @ 000001b3294a01c0] Could not open encoder before EOF\r\n[vost#0:0/h264_qsv @ 000001b3275524c0] Task finished with error: Invalid argument\r\n[vost#0:0/h264_qsv @ 000001b3275524c0] Terminating thread with error: Invalid argument\r\n[out#0/mp4 @ 000001b3275b6200] Nothing was written into output file, because at least one of its streams received no packets.\r\nframe=    0 fps=0.0 q=0.0 Lsize=       0KiB time=-00:00:04.39 bitrate=  -0.0kbits/s speed=N/A elapsed=0:00:00.05    \r\nConversion failed!\r\n"
+ },
+ {
+  "config": "qsv_gq16_fullhw",
+  "rc": 4294967256,
+  "times": [
+   0.521
+  ],
+  "mean": 0.521,
+  "sd": 0.0,
+  "size_MB": null,
+  "err_tail": "h264_qsv @ 000001da43ce3080] Could not open encoder before EOF\r\n[vost#0:0/h264_qsv @ 000001da43ce45c0] Task finished with error: Invalid argument\r\n[vost#0:0/h264_qsv @ 000001da43ce45c0] Terminating thread with error: Invalid argument\r\n[out#0/mp4 @ 000001da43d58280] Nothing was written into output file, because at least one of its streams received no packets.\r\nframe=    0 fps=0.0 q=0.0 Lsize=       0KiB time=-00:00:04.37 bitrate=  -0.0kbits/s speed=N/A elapsed=0:00:00.05    \r\nConversion failed!\r\n"
+ },
+ {
+  "config": "qsv_gq23_fullhw",
+  "rc": 4294967256,
+  "times": [
+   0.56
+  ],
+  "mean": 0.56,
+  "sd": 0.0,
+  "size_MB": null,
+  "err_tail": "h264_qsv @ 000001c5d7bcbf80] Could not open encoder before EOF\r\n[vost#0:0/h264_qsv @ 000001c5d5db1380] Task finished with error: Invalid argument\r\n[vost#0:0/h264_qsv @ 000001c5d5db1380] Terminating thread with error: Invalid argument\r\n[out#0/mp4 @ 000001c5d5e03180] Nothing was written into output file, because at least one of its streams received no packets.\r\nframe=    0 fps=0.0 q=0.0 Lsize=       0KiB time=-00:00:04.39 bitrate=  -0.0kbits/s speed=N/A elapsed=0:00:00.05    \r\nConversion failed!\r\n"
+ }
+]

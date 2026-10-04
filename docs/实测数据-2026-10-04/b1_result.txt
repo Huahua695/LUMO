@@ -1,0 +1,52 @@
+== 1) 复制 dist 副本 ==
+robocopy rc=1 (0-7 为成功)
+337M	E:/bench_tmp/work/b1copy
+== 2) 删除 tools/avdevice-63.dll ==
+N_m3u8DL-CLI.exe
+avcodec-63.dll
+avfilter-12.dll
+avformat-63.dll
+avutil-61.dll
+ffmpeg.exe
+ffprobe.exe
+realesrgan
+swresample-7.dll
+swscale-10.dll
+== 3) 基础命令 ==
+ffmpeg -version rc=0
+ffmpeg -encoders rc=0
+ffprobe -version rc=0
+== 4) 功能实测：抽帧 ==
+E:/bench_tmp/work/b1copy/tools/ffmpeg.exe: error while loading shared libraries: swscale-10.dll: cannot open shared object file: No such file or directory
+抽帧 rc=127 帧数=0
+== 5) 功能实测：合成 ==
+E:/bench_tmp/work/b1copy/tools/ffmpeg.exe: error while loading shared libraries: swscale-10.dll: cannot open shared object file: No such file or directory
+合成 rc=127 size=
+== 6) 功能实测：精确剪切 ==
+E:/bench_tmp/work/b1copy/tools/ffmpeg.exe: error while loading shared libraries: swscale-10.dll: cannot open shared object file: No such file or directory
+精确剪切 rc=127 size=
+== 7) 功能实测：音频提取(m4a copy 路径) ==
+E:/bench_tmp/work/b1copy/tools/ffmpeg.exe: error while loading shared libraries: swscale-10.dll: cannot open shared object file: No such file or directory
+音频提取 rc=127 size=
+== 8) 运行时已加载模块（长编码任务期间）==
+ffmpeg 运行中加载的本地模块列表见 results/b1_loaded_modules.txt
+== 9) tools/ 目录 DLL 清单对照 ==
+N_m3u8DL-CLI.exe
+avcodec-63.dll
+avfilter-12.dll
+avformat-63.dll
+avutil-61.dll
+ffmpeg.exe
+ffprobe.exe
+realesrgan
+swresample-7.dll
+swscale-10.dll
+== B1 done ==
+
+== 修正后的 B1 结论（手动复测确认）==
+robocopy 全量副本出现误导性报错（swscale-10.dll 加载失败），改用 cp -r 对照实验：
+1) t_full（完整拷贝）: ffmpeg -version rc=0 正常
+2) t_noav（删除 avdevice-63.dll）: ffmpeg.exe / ffprobe.exe 启动即失败 rc=127，
+   "error while loading shared libraries"（Git Bash 对 STATUS_DLL_NOT_FOUND 的呈现）
+3) 恢复 avdevice-63.dll 后立即正常 rc=0
+结论：ffmpeg.exe 静态导入 avdevice-63.dll，删除后进程无法启动 => 不可删。

@@ -1,0 +1,30 @@
+{
+ "tag": "s1_478x858_t512_r2",
+ "cmd": [
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\realesrgan-ncnn-vulkan.exe",
+  "-i",
+  "E:\\bench_tmp\\assets\\in_478x858",
+  "-o",
+  "E:\\bench_tmp\\work\\s1out_478x858_t512_r2",
+  "-n",
+  "realesr-animevideov3",
+  "-s",
+  "2",
+  "-m",
+  "E:\\vibe项目\\newvideo\\tools\\realesrgan\\models",
+  "-f",
+  "jpg",
+  "-t",
+  "512"
+ ],
+ "rc": 0,
+ "wall_s": 9.42,
+ "frames_out": 24,
+ "fps": 2.548,
+ "gpu_dedicated_max_MB": 0.0,
+ "gpu_shared_max_MB": 281.6,
+ "gpu_nonlocal_max_MB": 0.0,
+ "gpu_total_max_MB": 281.6,
+ "sys_commit_max_MB": 19787,
+ "stderr_tail": "/a=1/1/1  int8-p/s/a=1/1/1\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=92  bugcopc=0  bugihfa=0\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n0.00%\r\n50.00%\r\n"
+}

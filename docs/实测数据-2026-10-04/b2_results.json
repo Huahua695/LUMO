@@ -1,0 +1,48 @@
+{
+ "build_rc": 0,
+ "build_s": 76.7,
+ "internal_base_MB": 106.2,
+ "internal_new_MB": 141.9,
+ "saved_MB": -35.7,
+ "files": {
+  "Qt6Network.dll": {
+   "base": false,
+   "new": false
+  },
+  "libcrypto-3-x64.dll": {
+   "base": true,
+   "new": false
+  },
+  "libssl-3-x64.dll": {
+   "base": true,
+   "new": false
+  },
+  "libcrypto-3.dll": {
+   "base": true,
+   "new": true
+  },
+  "libssl-3.dll": {
+   "base": true,
+   "new": true
+  }
+ },
+ "pyside_removed": [
+  "QtNetwork.pyd"
+ ],
+ "pyside_added": [
+  "Qt6Pdf.dll",
+  "Qt6Qml.dll",
+  "Qt6QmlMeta.dll",
+  "Qt6QmlModels.dll",
+  "Qt6QmlWorkerScript.dll",
+  "Qt6Quick.dll",
+  "Qt6VirtualKeyboard.dll",
+  "opengl32sw.dll",
+  "translations"
+ ],
+ "pyside_base_MB": 69.2,
+ "pyside_new_MB": 111.3,
+ "selftest_rc": 1,
+ "selftest_s": 2.7,
+ "selftest_tail": ""
+}

@@ -1,0 +1,242 @@
+[
+ {
+  "source": "cfr_24000_1001",
+  "probe": {
+   "r_frame_rate": "24000/1001",
+   "avg_frame_rate": "24000/1001",
+   "nb_frames": "359",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 23.97602,
+  "fps_avg": 23.97602,
+  "frames_A(-r)": 359,
+  "frames_B(passthrough)": 359,
+  "frames_identical_count": true,
+  "md5_common": 359,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000180.jpg": "same",
+   "000359.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "14.973307",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": -27,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "14.973307",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ },
+ {
+  "source": "cfr_24",
+  "probe": {
+   "r_frame_rate": "24/1",
+   "avg_frame_rate": "24/1",
+   "nb_frames": "360",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 24.0,
+  "fps_avg": 24.0,
+  "frames_A(-r)": 360,
+  "frames_B(passthrough)": 360,
+  "frames_identical_count": true,
+  "md5_common": 360,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000181.jpg": "same",
+   "000360.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": 0,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ },
+ {
+  "source": "cfr_25",
+  "probe": {
+   "r_frame_rate": "25/1",
+   "avg_frame_rate": "25/1",
+   "nb_frames": "375",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 25.0,
+  "fps_avg": 25.0,
+  "frames_A(-r)": 375,
+  "frames_B(passthrough)": 375,
+  "frames_identical_count": true,
+  "md5_common": 375,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000188.jpg": "same",
+   "000375.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": 0,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ },
+ {
+  "source": "cfr_30000_1001",
+  "probe": {
+   "r_frame_rate": "30000/1001",
+   "avg_frame_rate": "30000/1001",
+   "nb_frames": "449",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 29.97003,
+  "fps_avg": 29.97003,
+  "frames_A(-r)": 449,
+  "frames_B(passthrough)": 449,
+  "frames_identical_count": true,
+  "md5_common": 449,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000225.jpg": "same",
+   "000449.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "14.981648",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": -18,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "14.981648",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ },
+ {
+  "source": "cfr_30",
+  "probe": {
+   "r_frame_rate": "30/1",
+   "avg_frame_rate": "30/1",
+   "nb_frames": "450",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 30.0,
+  "fps_avg": 30.0,
+  "frames_A(-r)": 450,
+  "frames_B(passthrough)": 450,
+  "frames_identical_count": true,
+  "md5_common": 450,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000226.jpg": "same",
+   "000450.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": 0,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ },
+ {
+  "source": "cfr_60",
+  "probe": {
+   "r_frame_rate": "60/1",
+   "avg_frame_rate": "60/1",
+   "nb_frames": "900",
+   "width": 640,
+   "height": 360,
+   "codec": "h264",
+   "duration": "15.000000",
+   "audio_duration": "15.000000"
+  },
+  "fps_r": 60.0,
+  "fps_avg": 60.0,
+  "frames_A(-r)": 900,
+  "frames_B(passthrough)": 900,
+  "frames_identical_count": true,
+  "md5_common": 900,
+  "md5_diff_count": 0,
+  "spot_check": {
+   "000001.jpg": "same",
+   "000451.jpg": "same",
+   "000900.jpg": "same"
+  },
+  "assemble_r_rc": 0,
+  "asm_r": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_r_drift_ms": 0,
+  "asm_r_av_gap_ms": 0,
+  "assemble_pt_rc": 0,
+  "asm_pt": {
+   "fmt_dur": "15.000000",
+   "video_dur": "15.000000",
+   "audio_dur": "15.000000"
+  },
+  "asm_pt_drift_ms": 0
+ }
+]

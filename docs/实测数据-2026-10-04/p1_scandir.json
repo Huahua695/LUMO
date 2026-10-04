@@ -1,0 +1,58 @@
+[
+ {
+  "n": 1000,
+  "idle": {
+   "mean_ms": 0.301,
+   "median_ms": 0.289,
+   "max_ms": 0.645
+  },
+  "with_writer": {
+   "mean_ms": 0.317,
+   "median_ms": 0.3,
+   "max_ms": 0.575
+  },
+  "pct_of_600ms": 0.05
+ },
+ {
+  "n": 4488,
+  "idle": {
+   "mean_ms": 1.318,
+   "median_ms": 1.274,
+   "max_ms": 1.96
+  },
+  "with_writer": {
+   "mean_ms": 1.371,
+   "median_ms": 1.3,
+   "max_ms": 3.111
+  },
+  "pct_of_600ms": 0.22
+ },
+ {
+  "n": 18000,
+  "idle": {
+   "mean_ms": 5.819,
+   "median_ms": 5.712,
+   "max_ms": 7.705
+  },
+  "with_writer": {
+   "mean_ms": 5.929,
+   "median_ms": 5.777,
+   "max_ms": 9.468
+  },
+  "pct_of_600ms": 0.97
+ },
+ {
+  "n": 50000,
+  "idle": {
+   "mean_ms": 16.584,
+   "median_ms": 16.406,
+   "max_ms": 19.977
+  },
+  "with_writer": {
+   "mean_ms": 16.466,
+   "median_ms": 16.387,
+   "max_ms": 18.938
+  },
+  "pct_of_600ms": 2.76
+ }
+]

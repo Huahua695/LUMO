@@ -1,0 +1,11 @@
+{
+ "tag": "t2048_s4",
+ "tile": 2048,
+ "scale": 4,
+ "rc": 0,
+ "fail_after_s": 680.32,
+ "frames_out": 24,
+ "frames_ffd9_ok": 24,
+ "frames_truncated": 0,
+ "stderr_full": "[0 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=0  bugcopc=0  bugihfa=0\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[0 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  queueC=1[1]  queueG=0[1]  queueT=2[1]\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  bugsbn1=0  bugbilz=56  bugcopc=0  bugihfa=0\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  fp16-p/s/a=1/1/1  int8-p/s/a=1/1/1\r\n[1 Intel(R) Arc(TM) 130T GPU (16GB)]  subgroup=32  basic=1  vote=1  ballot=1  shuffle=1\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n0.00%\r\n25.00%\r\n50.00%\r\n75.00%\r\n"
+}

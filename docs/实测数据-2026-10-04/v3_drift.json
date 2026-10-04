@@ -1,0 +1,43 @@
+{
+ "source": {
+  "fmt": "7.900100",
+  "video": "7.833400",
+  "audio": "7.829312"
+ },
+ "cur_r120": {
+  "extracted_frames": 949,
+  "framerate": 120.0,
+  "out_fmt_dur": "7.908333",
+  "out_video_dur": "7.908333",
+  "out_audio_dur": "7.829312",
+  "drift_vs_source_ms": 8,
+  "drift_per_min_ms": 63,
+  "av_gap_ms": 79,
+  "extract_rc": 0,
+  "asm_rc": 0
+ },
+ "pt": {
+  "extracted_frames": 215,
+  "framerate": 120.0,
+  "out_fmt_dur": "7.829313",
+  "out_video_dur": "1.791667",
+  "out_audio_dur": "7.829312",
+  "drift_vs_source_ms": -71,
+  "drift_per_min_ms": -538,
+  "av_gap_ms": -6038,
+  "extract_rc": 0,
+  "asm_rc": 0
+ },
+ "pt_avgfps": {
+  "extracted_frames": 215,
+  "framerate": 27.4466,
+  "out_fmt_dur": "7.832999",
+  "out_video_dur": "7.832999",
+  "out_audio_dur": "7.829333",
+  "drift_vs_source_ms": -67,
+  "drift_per_min_ms": -510,
+  "av_gap_ms": 4,
+  "extract_rc": 0,
+  "asm_rc": 0
+ }
+}

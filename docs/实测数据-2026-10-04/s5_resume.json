@@ -1,0 +1,22 @@
+[
+ {
+  "n": 4488,
+  "scan_listdir_ms_mean": 0.92,
+  "scan_ffd9_ms_mean": 309.0,
+  "scan_total_ms_mean": 309.92,
+  "missing_detected": 0,
+  "link_all_ms_mean": 744.47,
+  "link_count": 4488,
+  "worst_case_total_ms": 1054.38
+ },
+ {
+  "n": 18000,
+  "scan_listdir_ms_mean": 4.05,
+  "scan_ffd9_ms_mean": 575.3,
+  "scan_total_ms_mean": 579.35,
+  "missing_detected": 0,
+  "link_all_ms_mean": 3091.73,
+  "link_count": 18000,
+  "worst_case_total_ms": 3671.08
+ }
+]
