@@ -22,6 +22,16 @@ IMAGE_MODELS = {
     "anime": "realesrgan-x4plus-anime",
 }
 
+# tile 越大越快、越吃显存。实测（Arc 130T，S1/S3）：
+#   animevideov3  t512 比引擎默认 auto(≈t175) 快 11.0%，显存 320MB
+#   general-x4v3  t384 快 6.9%，显存 219MB
+# 两个重模型（x4plus / x4plus-anime）不列入：它们 auto 档已占 1.1~1.2GB，
+# 调到 t256 会到 1.7~1.8GB，2GB 显存的机器会失效——不值得用 5~7% 换掉可用性。
+TILE_BY_MODEL = {
+    "realesr-animevideov3": 512,
+    "realesr-general-x4v3": 384,
+}
+
 
 def plan_for(mode: str, scale: int, is_video: bool) -> tuple[str, int, float]:
     scale = int(scale)
@@ -184,6 +194,9 @@ def run_realesrgan(task, inp: str, outp: str, model: str, m_scale: int,
     stderr 落滚动日志文件，报障时无需复现。"""
     cmd = [realesrgan_exe(), "-i", inp, "-o", outp,
            "-n", model, "-s", str(m_scale), "-f", fmt]
+    tile = TILE_BY_MODEL.get(model)
+    if tile:
+        cmd += ["-t", str(tile)]
     proc = subprocess.Popen(cmd, creationflags=CREATE_NO_WINDOW,
                             stdout=subprocess.DEVNULL, stderr=stderr_target())
     task._proc = proc
@@ -244,7 +257,7 @@ def assemble(frames_out: str, src: str, fps: float, m_scale: int,
             "-i", os.path.join(frames_out, "%06d.jpg"), "-i", src,
             "-map", "0:v:0", "-map", "1:a?",
             "-vf", even_vf(eff),
-            "-c:v", "libx264", "-crf", "16", "-preset", "medium",
+            "-c:v", "libx264", "-crf", "16", "-preset", "veryfast",
             "-pix_fmt", "yuv420p", "-c:a", "copy",
             "-movflags", "+faststart", out_path]
     try:

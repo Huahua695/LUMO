@@ -131,7 +131,7 @@ class CutTask(BaseTask):
                     "-t", f"{duration:.3f}",
                     "-map", "0:v:0", "-map", "0:a?", "-map", "0:s?"]
             if self.mode == "accurate":
-                cmd = head + ["-c:v", "libx264", "-crf", "17", "-preset", "medium",
+                cmd = head + ["-c:v", "libx264", "-crf", "17", "-preset", "veryfast",
                               "-pix_fmt", "yuv420p", "-c:a", "copy",
                               "-movflags", "+faststart"]
             else:
