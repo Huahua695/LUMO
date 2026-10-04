@@ -868,6 +868,37 @@ def t_direct_referer_cookie_headers():
         srv.shutdown()
 
 
+def t_snippet_bookmarklet():
+    """S2.2 回归纪律：书签夹具（Node + mock DOM，13 场景/70 断言）对源文件版
+    与单行压缩版各跑一遍。只测源文件等于没测用户真正粘进书签的那串字符。"""
+    import subprocess
+    src_path = os.path.join(ROOT, "assets", "snippet.js")
+    ref_path = os.path.join(ROOT, "docs", "实测数据-2026-10-04", "sniffer",
+                            "snippet.src.js")
+    src = open(src_path, encoding="utf-8").read()
+    ref = open(ref_path, encoding="utf-8").read()
+    assert src == ref, "assets/snippet.js 必须与 docs 交付的 snippet.src.js 逐字一致"
+    # 压缩规则固定：行 strip 后用空格连接（源码里 } 与 else if 跨行，
+    # 无分隔符相连会改变语义；源文件保持零行内 // 注释）
+    bookmarklet = "javascript:" + " ".join(
+        l.strip() for l in src.splitlines() if l.strip())
+    tmp = os.path.join(tempfile.mkdtemp(), "snippet.bookmarklet.js")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(bookmarklet)
+
+    def run_node(path):
+        r = subprocess.run(
+            ["node", os.path.join(ROOT, "tests", "sniffer.test.js"), path],
+            capture_output=True, text=True, timeout=120)
+        lines = [l for l in (r.stdout or "").strip().splitlines() if l.strip()]
+        return lines[-1] if lines else f"rc={r.returncode} stderr={r.stderr[:200]}"
+
+    for label, p in (("源文件版", src_path), ("单行压缩版", tmp)):
+        tail = run_node(p)
+        assert "70 通过 / 0 失败" in tail, f"{label}: {tail}"
+    print(f"  （书签 URL {len(bookmarklet.encode('utf-8'))} 字节，T6 人工确认浏览器不截断）")
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1333,6 +1364,7 @@ def main():
     check("增强预检估算（E2E2 回代）", t_estimate_video_job)
     check("cookies.txt 解析与跨域隔离", t_cookiejar)
     check("sgref Referer 拆分与引擎路由", t_split_referer)
+    check("书签脚本源/压缩双跑 70 断言", t_snippet_bookmarklet)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
