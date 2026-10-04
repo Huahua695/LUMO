@@ -30,6 +30,7 @@ def build_exe():
         "--exclude-module", "PySide6.QtQuick",
         "--exclude-module", "PySide6.QtQml",
         "--exclude-module", "PySide6.QtPdf",
+        "--exclude-module", "PySide6.QtNetwork",   # app/ 无任何 QtNetwork 导入（-7.47MB）
         "--noupx",              # 本机从未装 UPX，spec 里的 upx=True 一直在静默跳过
         "--optimize", "2",      # 常量折叠 + 去 docstring，实测 exe -0.68MB
         "--distpath", DIST,
