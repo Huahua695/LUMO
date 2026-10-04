@@ -111,8 +111,8 @@ yt-dlp 覆盖不到的站点（如快手），只要浏览器里能播，就能�
 
 ### 普通用户
 
-从 **Releases** 下载 `拾光工具箱-vX.Y.Z.zip`，解压到任意位置，双击「拾光工具箱.exe」即可。
-无需安装 Python 或任何运行环境。
+从 **Releases** 下载 `LUMO-vX.Y.Z.zip`，解压得到「拾光工具箱」文件夹，
+双击其中的「拾光工具箱.exe」即可。无需安装 Python 或任何运行环境。
 
 > 发行包使用 LZMA 压缩（体积更小）。Windows 11 可直接右键「全部解压缩」；
 > **Windows 10 用户请改用 [7-Zip](https://www.7-zip.org/) 或 Bandizip 解压**，
