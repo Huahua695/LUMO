@@ -7,6 +7,9 @@ from urllib.parse import unquote, urlparse
 
 AUDIO_EXTS = DIRECT_EXTS - IMAGE_EXTS - VIDEO_EXTS
 
+# 书签脚本用 URL fragment 携带来源页（Referer）：#sgref=<encodeURIComponent(页面URL)>
+SGREF = "#sgref="
+
 # 排除集含中文标点与全部汉字：短链/BV号/数字ID 都是 ASCII，遇中文即断，
 # 从源头避免「链接后紧跟中文（无空格粘贴）」把 URL 污染
 URL_RE = re.compile(
@@ -70,10 +73,24 @@ def extract_urls(text: str):
     return urls
 
 
+def split_referer(url: str) -> tuple[str, str]:
+    """拆出书签脚本用 #sgref= 携带的来源页。返回 (纯媒体URL, referer)。
+
+    没有 sgref 片段时 referer 为 ''，纯媒体URL 即原串——
+    因此对既有全部链接形态是完全透明的。fragment 不会发给服务器，
+    是嗅探链接逐条自带 Referer 的带外通道。
+    """
+    url = url or ""
+    i = url.find(SGREF)
+    if i < 0:
+        return url, ""
+    return url[:i], urllib.parse.unquote(url[i + len(SGREF):])
+
+
 def detect_engine(url: str) -> str:
     """返回 'm3u8' | 'direct' | 'site'。"""
-    u = (url or "").strip()
-    low = u.lower()
+    u, _ref = split_referer((url or "").strip())  # 先剥离 #sgref=：Referer
+    low = u.lower()                               # 里的 .m3u8/.mpd 字样会误导路由
     if not low:
         return "site"
     if low.startswith("m3u8dl://") or ".m3u8" in low or ".mpd" in low:
@@ -87,7 +104,8 @@ def detect_engine(url: str) -> str:
 
 def url_media_kind(url: str):
     """直链的媒体类别：'video' | 'audio' | 'image' | None。"""
-    path = unquote(urlparse(url or "").path).lower()
+    u, _ref = split_referer(url)  # 同 detect_engine：先剥离再按 path 后缀匹配
+    path = unquote(urlparse(u or "").path).lower()
     for ext, kind in (
         tuple((e, "video") for e in VIDEO_EXTS)
         + tuple((e, "audio") for e in AUDIO_EXTS)

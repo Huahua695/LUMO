@@ -746,6 +746,40 @@ def t_cookiejar():
     shutil.rmtree(d)
 
 
+def t_split_referer():
+    """S3.2：#sgref= 拆分 + detect_engine/url_media_kind 先剥离再匹配"""
+    from app.url_detect import split_referer, detect_engine, url_media_kind, SGREF
+    # 无 fragment：原串返回、referer 空（对既有形态完全透明）
+    assert split_referer("https://a.com/x.mp4") == ("https://a.com/x.mp4", "")
+    assert split_referer("") == ("", "")
+    assert split_referer(None) == ("", "")
+    # 有 fragment（编码 / 未编码）
+    page = "https://www.page.com/watch/1"
+    u1, r1 = split_referer("https://a.com/x.m3u8#sgref=" + "https%3A%2F%2Fwww.page.com%2Fwatch%2F1")
+    assert u1 == "https://a.com/x.m3u8" and r1 == page, (u1, r1)
+    u2, r2 = split_referer(f"https://cdn.a.com/v.mp4#sgref={page}")
+    assert u2 == "https://cdn.a.com/v.mp4" and r2 == page
+    # URL 自身含 #（如 m3u8 时间锚点）但不是 sgref：整体返回
+    assert split_referer("https://a.com/x.m3u8#t=5") == ("https://a.com/x.m3u8#t=5", "")
+
+    # ★ 已实测确认的误判坑：媒体是 .mp4，但来源页路径含 .m3u8/.mpd → 必须判 direct
+    for bad in (
+        f"https://cdn.a.com/video.mp4#sgref=https%3A%2F%2Fp.com%2Fplayer.m3u8.html",
+        f"https://cdn.a.com/video.mp4#sgref=https%3A%2F%2Fp.com%2F%3Ff%3Dindex.mpd",
+    ):
+        assert detect_engine(bad) == "direct", bad
+        assert url_media_kind(bad) == "video", bad
+    # 带正确 fragment 的清单链接仍判 m3u8
+    assert detect_engine(f"https://a.com/x.m3u8#sgref={page}") == "m3u8"
+    assert detect_engine(f"https://a.com/x.mpd#sgref={page}") == "m3u8"
+    # 既有形态零回归
+    assert detect_engine("http://a/x/index.m3u8?token=1") == "m3u8"
+    assert detect_engine("https://www.bilibili.com/video/BV1xx") == "site"
+    assert url_media_kind("http://a/x.FLAC") == "audio"
+    assert url_media_kind("https://b.com/page?id=1") is None
+    assert SGREF == "#sgref="
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1205,6 +1239,7 @@ def main():
     check("无协议头/裸短链/BV号 提取", t_extract_urls_bare)
     check("增强预检估算（E2E2 回代）", t_estimate_video_job)
     check("cookies.txt 解析与跨域隔离", t_cookiejar)
+    check("sgref Referer 拆分与引擎路由", t_split_referer)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
