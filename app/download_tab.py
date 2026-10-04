@@ -4,16 +4,16 @@ import queue
 
 from PySide6.QtCore import QSize, Qt, QTimer
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QPlainTextEdit, QListWidget,
-    QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
+    QComboBox, QDialog, QFrame, QHBoxLayout, QLabel, QPlainTextEdit,
+    QListWidget, QListWidgetItem, QPushButton, QVBoxLayout, QWidget,
 )
 
 from . import icons, theme
 from .errors import friendly_error
+from .paths import asset_path, tools_ready
 from .theme import elide
 from .douyin import is_douyin
 from .url_detect import detect_engine, extract_urls, split_referer, url_media_kind, ENGINE_LABEL
-from .paths import tools_ready
 from .utils import human_size
 from .netenv import effective_proxy
 from .widgets import EmptyState, PathRow, SectionCard, TaskProgressRow, retire_thread
@@ -24,6 +24,25 @@ ROW_MIN_H = 66
 
 # 空状态的示例链接：B 站公开视频，走完整「解析卡片 → 下载」流程
 SAMPLE_URL = "https://www.bilibili.com/video/BV1GJ411x7h7/"
+
+_EXTRACTOR_HELP = (
+    "把浏览器里正在播放的视频链接提取出来（书签嗅探）：\n\n"
+    "1. 点「复制脚本」，在浏览器里把脚本内容添加为书签的网址；\n"
+    "2. 在目标网站开始播放视频，点一下该书签；\n"
+    "3. 单击弹出的链接即全选，Ctrl+C 复制，回到这里粘贴下载。\n\n"
+    "复制出的链接已内嵌来源页作为 Referer；若仍报 403，"
+    "请到「设置 → Cookie」导入该站登录态。\n"
+    "仅用于个人学习研究，请遵守各平台服务条款。")
+
+
+def bookmarklet_one_liner() -> str:
+    """把 assets/snippet.js 按固定规则压成单行书签 URL。
+    书签 URL 不能带换行；行 strip 后必须用空格连接（源码里 } 与 else if
+    跨行，直接相连会改变语义），源文件保持零行内 // 注释。"""
+    with open(asset_path("snippet.js"), encoding="utf-8") as f:
+        src = f.read()
+    return "javascript:" + " ".join(
+        l.strip() for l in src.splitlines() if l.strip())
 
 QUALITY_ITEMS = [
     ("best", "最佳画质（推荐）"),
@@ -78,8 +97,12 @@ class DownloadTab(QWidget):
         self.btn_paste = QPushButton("粘贴")
         self.btn_paste.setProperty("ghost", True)
         self.btn_paste.clicked.connect(self._paste)
+        self.btn_extract = QPushButton("提取链接")
+        self.btn_extract.setProperty("ghost", True)
+        self.btn_extract.clicked.connect(self._show_extractor)
         row.addWidget(self.url_edit, 1)
         row.addWidget(self.btn_paste)
+        row.addWidget(self.btn_extract)
         v1.addLayout(row)
 
         self.detect_label = QLabel("自动识别：等待输入…")
@@ -267,6 +290,49 @@ class DownloadTab(QWidget):
         theme.retag(self.detect_label, "accent")
         if not self._urls():
             self.detect_label.setText("自动识别：等待输入…")
+
+    def _show_extractor(self):
+        self._build_extractor_dialog().exec()
+
+    def _build_extractor_dialog(self):
+        """「提取链接」：浏览器书签嗅探的三步说明 + 一键复制脚本。
+        复制时按固定压缩规则转单行（书签 URL 不能带换行）。
+        构建与弹出分离，便于离屏测试。"""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("提取链接（浏览器嗅探）")
+        dlg.setMinimumWidth(460)
+        v = QVBoxLayout(dlg)
+        v.setSpacing(8)
+        for i, para in enumerate(_EXTRACTOR_HELP.split("\n\n")):
+            lbl = QLabel(para.strip())
+            lbl.setWordWrap(True)
+            lbl.setObjectName("sub" if i else "h2")
+            v.addWidget(lbl)
+        h = QHBoxLayout()
+        h.addStretch(1)
+        copy_btn = QPushButton("复制脚本")
+        h.addWidget(copy_btn)
+        close_btn = QPushButton("关闭")
+        close_btn.setProperty("ghost", True)
+        close_btn.clicked.connect(dlg.accept)
+        h.addWidget(close_btn)
+        v.addLayout(h)
+
+        def do_copy():
+            try:
+                text = bookmarklet_one_liner()
+            except OSError as e:
+                copy_btn.setText("读取失败")
+                copy_btn.setToolTip(str(e))
+                return
+            from PySide6.QtWidgets import QApplication
+            QApplication.clipboard().setText(text)
+            copy_btn.setText("已复制，粘贴到书签网址")
+            copy_btn.setEnabled(False)
+
+        copy_btn.clicked.connect(do_copy)
+        dlg._copy_btn = copy_btn
+        return dlg
 
     def _fill_sample(self):
         self.url_edit.setPlainText(SAMPLE_URL)

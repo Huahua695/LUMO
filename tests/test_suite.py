@@ -899,6 +899,38 @@ def t_snippet_bookmarklet():
     print(f"  （书签 URL {len(bookmarklet.encode('utf-8'))} 字节，T6 人工确认浏览器不截断）")
 
 
+def t_extractor_dialog():
+    """S3.1/S3.3：提取链接入口 + 单行压缩 + 剪贴板写入"""
+    from app.download_tab import DownloadTab, bookmarklet_one_liner
+    bm = bookmarklet_one_liner()
+    assert bm.startswith("javascript:") and "\n" not in bm, "书签 URL 必须是单行"
+    assert len(bm.encode("utf-8")) == 6096, len(bm.encode("utf-8"))
+
+    class _S:
+        pass
+    s = _S()
+    s.save_dir = tempfile.mkdtemp()
+    s.enhance_dir = tempfile.mkdtemp()
+    s.dl_quality = "best"
+    s.dl_format = "auto"
+    s.theme = "light"
+    s.cookie_file = ""
+    s.proxy_mode = "off"
+    s.proxy_url = ""
+    tab = DownloadTab(s)
+    assert tab.btn_extract.isVisibleTo(tab), "提取链接按钮应存在且可见"
+    dlg = tab._build_extractor_dialog()
+    assert "书签" in dlg.windowTitle() or "提取" in dlg.windowTitle()
+    btn = dlg._copy_btn
+    assert btn.text() == "复制脚本"
+    btn.click()  # do_copy 不关对话框，离屏安全
+    assert btn.text().startswith("已复制"), btn.text()
+    cb = QApplication.clipboard().text()
+    assert cb == bm, "剪贴板内容应逐字等于单行压缩书签"
+    shutil.rmtree(s.save_dir)
+    shutil.rmtree(s.enhance_dir)
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1365,6 +1397,7 @@ def main():
     check("cookies.txt 解析与跨域隔离", t_cookiejar)
     check("sgref Referer 拆分与引擎路由", t_split_referer)
     check("书签脚本源/压缩双跑 70 断言", t_snippet_bookmarklet)
+    check("提取链接入口与单行复制", t_extractor_dialog)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
