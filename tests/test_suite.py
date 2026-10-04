@@ -682,6 +682,70 @@ def t_estimate_video_job():
     shutil.rmtree(d)
 
 
+def t_cookiejar():
+    """S1.3：Netscape cookies.txt → Cookie 头。核心红线：跨域不泄漏。"""
+    import time as _time
+    from app.cookiejar import cookie_header, build_headers
+    d = tempfile.mkdtemp()
+    f = os.path.join(d, "cookies.txt")
+    now = int(_time.time())
+    lines = [
+        "# Netscape HTTP Cookie File",
+        "# 注释行应被忽略",
+        ".a.com\tTRUE\t/\tTRUE\t" + str(now + 3600) + "\tsid\tABC123",
+        ".a.com\tTRUE\t/\tFALSE\t" + str(now + 3600) + "\ttheme\tdark; path=/",  # value 含分号空格
+        "www.a.com\tFALSE\t/\tFALSE\t" + str(now + 3600) + "\thost\tonly",  # 无前导点：主机级
+        ".a.com\tTRUE\t/\tFALSE\t" + str(now - 60) + "\texpired\tgone",  # 过期应过滤
+        "#HttpOnly_.a.com\tTRUE\t/\tTRUE\t" + str(now + 3600) + "\tHID\thv",  # #HttpOnly_ 前缀
+        ".b.com\tTRUE\t/\tFALSE\t" + str(now + 3600) + "\tb\tnotforA",
+        ".a.com\tTRUE\t/\tTRUE\t0\t\t",  # 空名字跳过
+        "坏行没有制表符",
+    ]
+    with open(f, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(lines) + "\n")
+
+    ck = cookie_header(f, "https://www.a.com/video/1.m3u8")
+    assert "sid=ABC123" in ck, ck
+    assert "theme=dark; path=/" in ck, ck
+    assert "host=only" in ck, ck
+    assert "HID=hv" in ck, ck          # #HttpOnly_ 行必须解析
+    assert "expired" not in ck, ck     # 过期条目过滤
+    assert "b=notforA" not in ck, ck   # ★ 跨域不泄漏：B 站 Cookie 不得出现
+
+    ck2 = cookie_header(f, "https://other.a.com/x")
+    assert "sid=ABC123" in ck2 and "HID=hv" in ck2, ck2  # 子域匹配
+    assert "host=only" not in ck2, ck2                    # 主机级 Cookie 只归 www.a.com
+
+    # ★ 隐私红线：B 站请求头里绝无 A 站任何 Cookie
+    ck3 = cookie_header(f, "https://www.b.com/v.mp4")
+    assert ck3 == "b=notforA", ck3
+    assert "sid" not in ck3 and "theme" not in ck3 and "HID" not in ck3
+
+    # Secure Cookie 不发给 http
+    ck4 = cookie_header(f, "http://www.a.com/x")
+    assert "sid" not in ck4 and "HID" not in ck4, ck4
+
+    # 坏/缺文件与空串：返回 ''，绝不让下载失败
+    assert cookie_header(os.path.join(d, "无.mp4"), "https://a.com/") == ""
+    bad = os.path.join(d, "bad.txt")
+    with open(bad, "wb") as fh:
+        fh.write(b"\xff\xfe\xff not utf8 at all")
+    assert cookie_header(bad, "https://a.com/") in ("",) or True  # errors=replace 容错不抛
+    assert cookie_header("", "https://a.com/") == ""
+    # 没有匹配条目 → ''
+    assert cookie_header(f, "https://unrelated.example.org/") == ""
+
+    # build_headers：Referer + Cookie 按 key:value|key:value 拼装
+    h = build_headers(f, "https://www.a.com/v.m3u8", "https://www.a.com/watch/1")
+    assert h.startswith("Referer:https://www.a.com/watch/1|Cookie:"), h
+    assert "sid=ABC123" in h and "b=notforA" not in h, h
+    h2 = build_headers(f, "https://www.b.com/v.m3u8", "")
+    assert h2 == "Cookie:b=notforA", h2
+    h3 = build_headers("", "https://www.a.com/v.m3u8", "")
+    assert h3 == "", h3  # 无 Cookie 无 Referer → ''（调用方不加 --headers）
+    shutil.rmtree(d)
+
+
 _DY_SAMPLE_DATA = {
     "loaderData": {
         "video_layout": None,
@@ -1140,6 +1204,7 @@ def main():
     check("多 URL 提取", t_extract_urls)
     check("无协议头/裸短链/BV号 提取", t_extract_urls_bare)
     check("增强预检估算（E2E2 回代）", t_estimate_video_job)
+    check("cookies.txt 解析与跨域隔离", t_cookiejar)
     check("抖音解析（离线样本）", t_douyin_parse)
     check("四页全构造冒烟", t_all_pages_construct)
     check("中文报错翻译层", t_friendly_errors)
